@@ -1,0 +1,29 @@
+[package]
+name = "nimy"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+cached = "0.56.0"
+lazy_static = "1.5.0"
+lsp-types = "0.97.0"
+normalize-path = "0.2.1"
+tree-sitter = "0.25.2"
+which = "8.0.0"
+
+[dependencies.tower-lsp-macros]
+git = "https://github.com/ebkalderon/tower-lsp"
+rev = "7b580128faa39b907db8f40bc53924181887acde"
+
+[dependencies.tree-sitter-nim]
+git = "https://github.com/vanyle/tree-sitter-nim"
+rev = "44d9ba36430fede749577d7830df395d91662d34"
+
+[dependencies.tower-lsp]
+git = "https://github.com/ebkalderon/tower-lsp"
+rev = "7b580128faa39b907db8f40bc53924181887acde"
+default-features = false
+features = ["runtime-agnostic"]
+
+[build-dependencies]
+type-sitter-gen = "0.7.4"

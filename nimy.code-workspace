@@ -1,0 +1,21 @@
+{
+	"folders": [
+		{
+			"name": "Nimy 👑",
+			"path": ".",
+		},
+	],
+	"extensions": {
+		"recommendations": ["rust-lang.rust-analyzer", "vadimcn.vscode-lldb"],
+	},
+	"settings": {
+		"rust-analyzer.completion.autoimport.enable": true,
+		"editor.codeActionsOnSave": {
+			"source.organizeImports": "always",
+		},
+	},
+	"launch": {
+		"version": "0.2.0",
+		"configurations": [],
+	},
+}

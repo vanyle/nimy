@@ -1,0 +1,14 @@
+[jobs.test-nowarn]
+command = ["cargo", "test", "--", "--nocapture","--show-output"]
+env.RUSTFLAGS = "-A warnings"
+need_stdout = true
+background = false
+ignored_lines = []
+
+# Run without warnings for nicer devex
+[jobs.run-nowarn]
+command = ["cargo", "run","-q"]
+env.RUSTFLAGS = "-A warnings"
+need_stdout = true
+background = false
+ignored_lines = []
