@@ -7,6 +7,7 @@ use std::{
 };
 
 use crate::nimy::{
+    compiletimeeval::evaluate_compile_time_expression,
     generics::{self, GenericType},
     installation,
     namedtypes::MaybeGenericType,
@@ -195,8 +196,76 @@ fn handle_top_level(
             NodeKind::TypeSection => {
                 handle_type_section(cpunit, &child, scope);
             }
-            // ...
-            _ => (),
+            NodeKind::When => handle_conditional(&child, cpunit, scope, imports),
+            _ => {}
+        }
+    }
+}
+
+fn handle_conditional(
+    node: &trees::ParseNode,
+    cpunit: &CompilationUnit,
+    scope: &mut InnerScope,
+    imports: &mut FileReferences,
+) {
+    assert!(matches!(
+        node.kind,
+        NodeKind::When | NodeKind::ElifBranch | NodeKind::ElseBranch
+    ));
+    // When = "when" <compile-time-condition> ":" <statement-list> [elif-branch] [else]
+    // elif-branch = "elif" <compile-time-condition> ":" <statement-list>
+    // else-branch = "else" <compile-time-condition> ":" <statement-list>
+    let children = node.children_without_comments().collect::<Vec<_>>();
+    if children.is_empty() {
+        return; // This is "when", the keyword, not the branch in the AST.
+    }
+
+    let Some(compile_time_expression) = children.get(1) else {
+        // This is an error.
+        return;
+    };
+
+    // The Nim compiler does not perform any checks on when branches that are not taken, which is
+    // fair, but should we do the same? Typing and other static analysis for 'when' branches
+    // can be helpful! We need to take a careful approach to avoid false positives.
+    // As when branch can rely on types defined in other branches, some things like
+    // references to undefined types inside 'when false' branches should be allowed,
+    // but other things like syntax errors should not.
+    // Worst case scenario, the user can add a comment/pragma to disables the checks for the branch.
+
+    let when_val = evaluate_compile_time_expression(compile_time_expression, cpunit, scope);
+    let is_truthy = when_val.is_truthy();
+    // There can be "elif" branches in whens
+    if is_truthy.unwrap_or(false) {
+        let statements = children.get(3);
+        if let Some(statements) = statements {
+            handle_top_level(cpunit, statements, scope, imports);
+        }
+    } else {
+        // else-if and else logic
+        for when_child in &children {
+            match when_child.kind {
+                NodeKind::ElifBranch => {
+                    let compile_time_expression = when_child.child(1).unwrap();
+                    let elif_val =
+                        evaluate_compile_time_expression(&compile_time_expression, cpunit, scope);
+                    if elif_val.is_truthy().unwrap_or(false) {
+                        let statements = when_child.child(3);
+                        if let Some(statements) = statements {
+                            handle_top_level(cpunit, &statements, scope, imports);
+                        }
+                        return; // We found a truthy elif branch, no need to check else.
+                    }
+                }
+                NodeKind::ElseBranch => {
+                    let statements = when_child.child(2);
+                    if let Some(statements) = statements {
+                        handle_top_level(cpunit, &statements, scope, imports);
+                    }
+                    return;
+                }
+                _ => continue,
+            }
         }
     }
 }
@@ -211,9 +280,7 @@ fn handle_type_section(cpunit: &CompilationUnit, node: &trees::ParseNode, scope:
         .map(|child| parse_type_declaration(cpunit, &child, scope))
         .collect::<Vec<_>>();
 
-    // Perform resolution of types within the block
-    // MARK: TODO cycles
-
+    // Add types from within the block
     for t in named_types {
         match t.content {
             MaybeGenericType::GenericType(generic) => {
@@ -409,7 +476,7 @@ fn parse_type_from_bracket_expression(
     generic_parameters: &[Rc<GenericParameterType>],
 ) -> Option<Rc<NimType>> {
     assert_eq!(node.kind, NodeKind::BracketExpression);
-    let generic_name = node.child(0).unwrap().to_str();
+    let generic_name = node.child(0).expect("Expected generic name").to_str();
     let generic_type = resolve_generic_type(&generic_name, cpunit, scope)?;
     let arguments = node.get_by_kind(NodeKind::ArgumentList)?;
 

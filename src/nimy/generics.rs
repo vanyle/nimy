@@ -113,8 +113,9 @@ fn find_and_replace_generics(
 
     match type_with_generic_param.as_ref() {
         NimType::Int
+        | NimType::Bool
         | NimType::Float
-        | NimType::Nil
+        | NimType::TypeOfNil
         | NimType::String
         | NimType::Untyped
         | NimType::Alias(..)

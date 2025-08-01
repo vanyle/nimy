@@ -76,6 +76,11 @@ impl<'a, 'tree> ParseNode<'a, 'tree> {
         })
     }
 
+    pub fn children_without_comments(self) -> impl Iterator<Item = ParseNode<'a, 'tree>> {
+        self.children()
+            .filter(|child| child.kind != NodeKind::Comment)
+    }
+
     pub fn get_by_kind(self, kind: NodeKind) -> Option<ParseNode<'a, 'tree>> {
         self.children().find(|child| child.kind == kind)
     }
@@ -134,7 +139,10 @@ impl<'a, 'tree> ParseNode<'a, 'tree> {
         std::str::from_utf8(self.to_u8()).expect("Invalid UTF-8 in ParseNode")
     }
     pub fn dbg_str(&self) -> String {
-        self.dbg_indented(0)
+        self.dbg_indented(0, 99)
+    }
+    pub fn dbg_str_with_max_depth(&self, depth: usize) -> String {
+        self.dbg_indented(0, depth)
     }
 
     pub fn loc(&self) -> String {
@@ -142,21 +150,22 @@ impl<'a, 'tree> ParseNode<'a, 'tree> {
         format!("{}:{}:{}", self.path.display(), pos.row + 1, pos.column + 1)
     }
 
-    fn dbg_indented(&self, indent: usize) -> String {
+    fn dbg_indented(&self, indent: usize, maxdepth: usize) -> String {
         let indent_str = "\t".repeat(indent);
         let kind = self.node.kind();
         let children = self.children();
-        let has_children = self.child_count() != 0;
+        let has_children = self.child_count() > 0;
+        if indent >= maxdepth {
+            return format!("{indent_str}{kind} \"... omitted ...\"");
+        }
         if !has_children {
             return format!(
-                "{}{} \"{}\"",
-                indent_str,
-                kind,
+                "{indent_str}{kind} \"{}\"",
                 String::from_utf8_lossy(self.to_u8())
             );
         }
         let children = children
-            .map(|c| c.dbg_indented(indent + 1))
+            .map(|c| c.dbg_indented(indent + 1, maxdepth))
             .collect::<Vec<_>>()
             .join("\n");
         format!("{}{}{}{}", indent_str, kind, "\n", children)
@@ -569,6 +578,8 @@ pub fn kind_to_enum(kind: &str) -> NodeKind {
         "," => NodeKind::Comma,
         "[" => NodeKind::LBracket,
         "]" => NodeKind::RBracket,
+        "{" => NodeKind::LBrace,
+        "}" => NodeKind::RBrace,
         "*" => NodeKind::Mul,
         ":" => NodeKind::Colon,
         ";" => NodeKind::Semicolon,
@@ -578,7 +589,10 @@ pub fn kind_to_enum(kind: &str) -> NodeKind {
         "#[" => NodeKind::HashLBracket,
         "]#" => NodeKind::RBracketHash,
         "#" => NodeKind::Hash,
+        "." => NodeKind::Dot,
         "ERROR" => NodeKind::Error,
+        "\"" => NodeKind::DoubleQuote,
+        "\"\"\"" => NodeKind::DoubleQuoteDoubleQuoteDoubleQuote,
         _ => {
             panic!("Unknown node kind: {kind}");
             NodeKind::Unknown

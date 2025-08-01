@@ -7,11 +7,12 @@ use super::symbols::Symbol;
 #[derive(Debug, Eq, PartialEq)]
 pub enum NimType {
     Int,
+    Bool,
     Float,
     String,
     Typedesc,
     Typed,
-    Nil,
+    TypeOfNil,
     Untyped,
     Alias(Rc<str>), // not a symbol here as an alias is not yet resolved
     AliasGeneric(Rc<str>, Vec<Rc<NimType>>), // an alias to a generic instanciation, like `Bluck[int]`
@@ -42,11 +43,12 @@ impl std::fmt::Display for NimType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             NimType::Int => write!(f, "int"),
+            NimType::Bool => write!(f, "bool"),
             NimType::Float => write!(f, "float"),
             NimType::String => write!(f, "string"),
             NimType::Typedesc => write!(f, "typedesc"),
             NimType::Typed => write!(f, "typed"),
-            NimType::Nil => write!(f, "nil"),
+            NimType::TypeOfNil => write!(f, "nil"),
             NimType::Untyped => write!(f, "untyped"),
             NimType::Alias(inner) => write!(f, "alias({inner})"),
             NimType::AliasGeneric(name, args) => {
@@ -198,11 +200,12 @@ impl NimType {
             ),
             NimType::GenericParameter(param) => Box::new(param.subtype_constraint.iter()),
             NimType::Int
+            | NimType::Bool
             | NimType::Enum(_)
             | NimType::Float
             | NimType::Typedesc
             | NimType::Typed
-            | NimType::Nil
+            | NimType::TypeOfNil
             | NimType::Alias(..)
             | NimType::Undefined(..)
             | NimType::Magic(..)
@@ -333,6 +336,7 @@ pub fn to_undefined_type(node: &ParseNode) -> NimType {
 
 thread_local! {
     pub static INT: Rc<NimType> = Rc::new(NimType::Int);
+    pub static BOOL: Rc<NimType> = Rc::new(NimType::Bool);
     pub static FLOAT: Rc<NimType> = Rc::new(NimType::Float);
     pub static STRING: Rc<NimType> = Rc::new(NimType::String);
     pub static TYPEDESC: Rc<NimType> = Rc::new(NimType::Typedesc);
@@ -343,6 +347,7 @@ thread_local! {
 pub fn str_to_type(s: &str) -> Option<Rc<NimType>> {
     match s {
         "int" => Some(INT.with(|f| f.clone())),
+        "bool" => Some(BOOL.with(|f| f.clone())),
         "float" => Some(FLOAT.with(|f| f.clone())),
         "string" => Some(STRING.with(|f| f.clone())),
         "typedesc" => Some(TYPEDESC.with(|f| f.clone())),
