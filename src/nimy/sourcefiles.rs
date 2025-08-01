@@ -8,7 +8,7 @@ use crate::nimy::{cpunit::CompilationUnit, trees::ParseTree, typer::Scope};
 
 /// Represents a parsed Nim file
 #[derive(Debug)]
-pub struct NimFile {
+pub struct SourceFile {
     pub path: Rc<PathBuf>,
     pub last_updated: std::time::SystemTime,
 
@@ -23,7 +23,7 @@ pub struct NimFile {
 #[derive(Debug)]
 pub struct FileReferences(pub Vec<PathBuf>);
 
-impl NimFile {
+impl SourceFile {
     /// Creates a new NimFile from a given path, using the content provided.
     /// Assumes that the file might not exist on the filesystem.
     pub fn new(cpunit: &CompilationUnit, path: PathBuf, content: &[u8]) -> Self {
@@ -42,7 +42,7 @@ impl NimFile {
             &path,
             content,
         );
-        NimFile {
+        SourceFile {
             path,
             last_updated: std::time::SystemTime::now(),
             tree: None,
@@ -55,7 +55,7 @@ impl NimFile {
     pub fn new_from_file(cpunit: &CompilationUnit, path: PathBuf) -> Self {
         let content = std::fs::read(&path)
             .unwrap_or_else(|err| panic!("Failed to read Nim file {}: {}", path.display(), err));
-        NimFile::new(cpunit, path, &content)
+        SourceFile::new(cpunit, path, &content)
     }
 
     pub fn needs_update_according_to_last_modified(&self) -> bool {
@@ -118,9 +118,9 @@ impl NimFile {
     fn files_needed_to_resolve_current_file<'a>(
         &'a self,
         cpunit: &'a CompilationUnit,
-    ) -> Box<dyn Iterator<Item = Rc<RefCell<NimFile>>> + 'a> {
+    ) -> Box<dyn Iterator<Item = Rc<RefCell<SourceFile>>> + 'a> {
         let system_lib = cpunit.get_system_path();
-        let files: Box<dyn Iterator<Item = Rc<RefCell<NimFile>>>> = Box::new(
+        let files: Box<dyn Iterator<Item = Rc<RefCell<SourceFile>>>> = Box::new(
             self.imports
                 .0
                 .iter()
@@ -192,7 +192,7 @@ fn get_last_modified(path: &PathBuf) -> std::time::SystemTime {
         .unwrap_or_else(|_| std::time::SystemTime::now())
 }
 
-impl std::fmt::Display for NimFile {
+impl std::fmt::Display for SourceFile {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "NimFile({})", self.path.display())
     }

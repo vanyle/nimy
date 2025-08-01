@@ -4,13 +4,13 @@ use std::rc::Rc;
 use std::{collections::HashMap, path::PathBuf};
 
 use super::installation;
-use super::sourcefiles::NimFile;
+use super::sourcefiles::SourceFile;
 
 /// Represents an execution of the nim compiler.
 /// Can be reused to perform type-checks as files get edited.
 pub struct CompilationUnit {
     pub parser: RefCell<tree_sitter::Parser>,
-    pub filecache: RefCell<HashMap<PathBuf, Rc<RefCell<NimFile>>>>,
+    pub filecache: RefCell<HashMap<PathBuf, Rc<RefCell<SourceFile>>>>,
     pub compilation_flags: HashMap<String, String>,
 
     system_path: Option<PathBuf>,
@@ -56,13 +56,13 @@ impl CompilationUnit {
 
     /// Get a reference to a NimFile which contains the exported symbols at the path provided.
     /// If no content is provided, the file is read to obtain the content.
-    pub fn query_file(&self, path: &Path, content: Option<&[u8]>) -> Rc<RefCell<NimFile>> {
+    pub fn query_file(&self, path: &Path, content: Option<&[u8]>) -> Rc<RefCell<SourceFile>> {
         let nim_file = self.filecache.borrow_mut().get(path).cloned();
         match nim_file {
             None => {
                 let new_file = Rc::new(RefCell::new(match content {
-                    Some(content) => NimFile::new(self, path.to_path_buf(), content),
-                    None => NimFile::new_from_file(self, path.to_path_buf()),
+                    Some(content) => SourceFile::new(self, path.to_path_buf(), content),
+                    None => SourceFile::new_from_file(self, path.to_path_buf()),
                 }));
                 self.filecache
                     .borrow_mut()
