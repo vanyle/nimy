@@ -1,8 +1,5 @@
-// use nimy::nimy::nimtype::{NimType, NimVariable, Scope};
-
-use std::{env, path::Path};
-
 use nimy::nimy::{cpunit::CompilationUnit, types};
+use std::{env, path::Path};
 
 #[test]
 fn it_resolves_simple_types() {
@@ -23,6 +20,18 @@ fn it_resolves_simple_types() {
     let st = st.unwrap();
     assert!(types::INT.with(|i| i == &st));
 
+    let st = root_scope.resolve_type("NestedGeneric", &compilation_unit);
+    assert!(st.is_some(), "Failed to resolve NestedGeneric");
+
+    let st = root_scope.resolve_type("MoreType", &compilation_unit);
+    assert!(st.is_some(), "Failed to resolve MoreType");
+
+    let generics = root_scope.defined_generic_names();
+    assert!(
+        generics.contains(&"Pair".to_string()),
+        "Pair generic not found"
+    );
+
     /*
     println!("Parsed types:");
     for t in &root_scope.types {
@@ -33,9 +42,4 @@ fn it_resolves_simple_types() {
         println!("  {t}");
     }
     */
-}
-
-#[test]
-fn it_parses_reports_type_errors() {
-    // assert_eq!(false, true, "This test is not implemented yet.");
 }

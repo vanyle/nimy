@@ -663,6 +663,11 @@ fn parse_type_expression(
                 parse_type_expression(&node.child(1).unwrap(), cpunit, scope, generic_parameters);
             in_var.map(|t| Rc::new(NimType::Var(t)))
         }
+        NodeKind::PointerType => {
+            let in_ptr =
+                parse_type_expression(&node.child(1).unwrap(), cpunit, scope, generic_parameters);
+            in_ptr.map(|t| Rc::new(NimType::Ptr(t)))
+        }
         NodeKind::RefType => {
             let in_ref =
                 parse_type_expression(&node.child(1).unwrap(), cpunit, scope, generic_parameters);

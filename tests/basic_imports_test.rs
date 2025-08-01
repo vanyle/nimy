@@ -1,6 +1,5 @@
-use std::{env, path::Path};
-
 use nimy::nimy::cpunit::CompilationUnit;
+use std::{env, path::Path};
 
 #[test]
 fn it_resolves_imports() {
