@@ -5,10 +5,12 @@ use nimy::nimy::cpunit::CompilationUnit;
 #[test]
 fn it_resolves_imports() {
     let path = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join(file!())
-        .join("../basic_imports_test.nim")
+        .join(Path::new(file!()).parent().unwrap())
+        .join("basic_imports_test.nim");
+
+    let path = path
         .canonicalize()
-        .expect("Failed to canonicalize path");
+        .unwrap_or_else(|_| panic!("Failed to canonicalize {}", path.display()));
     let file = include_str!("basic_imports_test.nim");
 
     let compilation_unit = CompilationUnit::new(false);

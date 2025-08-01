@@ -14,6 +14,7 @@ Moreover, Nimy tries to sort suggestions by relevance and take types into accoun
 
 ## Working on Nimy
 
+- You'll need a working Nim Installation in your PATH, at least v2.
 - Build the project locally with `cargo build`
 - Start bacon to enable watch mode for tests: `bacon test-nowarn`
 - Start coding!

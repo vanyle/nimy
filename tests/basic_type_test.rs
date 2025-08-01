@@ -7,8 +7,8 @@ use nimy::nimy::{cpunit::CompilationUnit, types};
 #[test]
 fn it_resolves_simple_types() {
     let path = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join(file!())
-        .join("../basic_type_test.nim")
+        .join(Path::new(file!()).parent().unwrap())
+        .join("basic_type_test.nim")
         .canonicalize()
         .expect("Failed to canonicalize path");
     let file = include_str!("basic_type_test.nim");

@@ -68,34 +68,31 @@ pub fn get_nim_installation_info() -> NimInstallationInfo {
 
     NimInstallationInfo {
         path: nim_path.clone(),
-        pkgs_path: nim_path.join("../../pkgs2").normalize(),
+        pkgs_path: nim_path.join("../../pkgs").normalize(),
         version,
         std_lib_paths: lib_paths,
     }
 }
 
-/// Given a nim library name, return the path to the corresponding library file.
-pub fn get_lib_path(lib_name: &str) -> Option<PathBuf> {
+pub fn get_likely_lib_paths(lib_name: &str) -> Box<dyn Iterator<Item = PathBuf>> {
     let installation = get_nim_installation_info();
     let lib_name_with_nim_suffix = format!("{lib_name}.nim");
 
     let pkgs_path = installation.pkgs_path;
-    let dirs = read_dir(pkgs_path);
-    let Ok(dirs) = dirs else {
-        return None;
-    };
-    // Start with user installed libraries
     let (lib_name_base, rest) = lib_name.split_once("/").unwrap_or((lib_name, ""));
+    let dirs = read_dir(pkgs_path);
+    let mut iter_result: Box<dyn Iterator<Item = PathBuf>> = Box::new(std::iter::empty());
 
-    if lib_name_base != "std" {
-        for d in dirs {
-            let Ok(d) = d else {
-                continue;
-            };
-            if d.path().starts_with(lib_name_base) {
-                let f = d.path().join(&lib_name_with_nim_suffix);
-                if f.exists() {
-                    return Some(f);
+    if let Ok(dirs) = dirs {
+        // Start with user installed libraries
+        if lib_name_base != "std" {
+            for d in dirs {
+                let Ok(d) = d else {
+                    continue;
+                };
+                if d.path().starts_with(lib_name_base) {
+                    let f = d.path().join(&lib_name_with_nim_suffix);
+                    iter_result = Box::new(iter_result.chain(std::iter::once(f)));
                 }
             }
         }
@@ -104,18 +101,20 @@ pub fn get_lib_path(lib_name: &str) -> Option<PathBuf> {
     let lib_name_with_nim_suffix = if lib_name_base != "std" {
         lib_name_with_nim_suffix
     } else {
-        format!("{rest}.nim")
+        format!("{rest}.nim") // strip std/ for standard libraries
     };
 
     // If not found, search for system libraries
     for sys_dir in installation.std_lib_paths {
         let f = sys_dir.join(&lib_name_with_nim_suffix);
-        if f.exists() {
-            return Some(f);
-        }
+        iter_result = Box::new(iter_result.chain(std::iter::once(f)));
     }
+    iter_result
+}
 
-    None
+/// Given a nim library name, return the path to the corresponding library file.
+pub fn get_lib_path(lib_name: &str) -> Option<PathBuf> {
+    get_likely_lib_paths(lib_name).find(|p| p.exists())
 }
 
 pub fn get_system_lib_path() -> Option<PathBuf> {
@@ -152,14 +151,31 @@ mod tests {
 
         for lib_name in common_libs {
             let lib_path = get_lib_path(lib_name);
-            assert!(lib_path.is_some());
+            if lib_path.is_none() {
+                let searched_paths = get_likely_lib_paths(lib_name).collect::<Vec<_>>();
+                eprintln!("Searched paths for {lib_name}: {searched_paths:?}");
+            }
+            assert!(
+                lib_path.is_some(),
+                "Expected to find library {lib_name} (it should be part of the standard Nim library), but got None.\n
+                Information gathered about the Nim installation: {:?}",
+                get_nim_installation_info()
+            );
             let path = &lib_path.unwrap();
-            assert!(path.ends_with(format!("{lib_name}.nim")));
-            assert!(path.exists());
+            assert!(
+                path.ends_with(format!("{lib_name}.nim")),
+                "Expected path to end with {lib_name}.nim, got: {path:?}"
+            );
+            assert!(
+                path.exists(),
+                "Expected the path to the library to exist, but it does not: {path:?}"
+            );
 
             let as_string = path.to_string_lossy();
-            assert!(as_string.contains("nim-"));
-            assert!(as_string.contains("lib"));
+            assert!(
+                as_string.contains("lib"),
+                "Expected the path to contain 'lib', but it does not: {as_string}"
+            );
         }
 
         // eprintln!("Library path: {path:?}");

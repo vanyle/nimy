@@ -6,8 +6,8 @@ pub mod nimy;
 
 fn main() {
     let path = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join(file!())
-        .join("../../scratchpad.nim")
+        .join(Path::new(file!()).parent().unwrap())
+        .join("../scratchpad.nim")
         .canonicalize()
         .expect("Failed to canonicalize path");
     let file = include_str!("../scratchpad.nim");
