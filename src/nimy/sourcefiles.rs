@@ -1,6 +1,9 @@
+use std::cell::RefCell;
+use std::iter;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
+use crate::nimy::namedtypes::{NamedGenericType, NamedRegularType};
 use crate::nimy::{cpunit::CompilationUnit, trees::ParseTree, typer::Scope};
 
 /// Represents a parsed Nim file
@@ -96,12 +99,79 @@ impl NimFile {
     }
 
     /// Return a list of concrete types defined inside the file
-    pub fn defined_types(&self) -> Vec<String> {
+    pub fn defined_type_names(&self) -> Vec<String> {
         self.root_scope.defined_type_names()
     }
 
-    pub fn defined_generics(&self) -> Vec<String> {
+    pub fn defined_generic_names(&self) -> Vec<String> {
         self.root_scope.defined_generic_names()
+    }
+
+    pub fn defined_types(&self) -> Vec<Rc<NamedRegularType>> {
+        self.root_scope.defined_types()
+    }
+
+    pub fn defined_generics(&self) -> Vec<Rc<NamedGenericType>> {
+        self.root_scope.defined_generics()
+    }
+
+    fn files_needed_to_resolve_current_file<'a>(
+        &'a self,
+        cpunit: &'a CompilationUnit,
+    ) -> Box<dyn Iterator<Item = Rc<RefCell<NimFile>>> + 'a> {
+        let system_lib = cpunit.get_system_path();
+        let files: Box<dyn Iterator<Item = Rc<RefCell<NimFile>>>> = Box::new(
+            self.imports
+                .0
+                .iter()
+                .map(|path| cpunit.query_file(path, None)),
+        );
+        if let Some(system_lib) = system_lib {
+            Box::new(files.chain(iter::once(cpunit.query_file(system_lib, None))))
+        } else {
+            files
+        }
+    }
+
+    pub fn available_types(&self, cpunit: &CompilationUnit) -> Vec<Rc<NamedRegularType>> {
+        let files = self.files_needed_to_resolve_current_file(cpunit);
+        let types = files
+            .flat_map(|file| {
+                file.borrow()
+                    .defined_types()
+                    .into_iter()
+                    .filter(|t| t.sym.is_exported)
+            })
+            .chain(self.defined_types());
+
+        types.collect::<Vec<_>>()
+    }
+
+    pub fn available_type_names(&self, cpunit: &CompilationUnit) -> Vec<String> {
+        self.available_types(cpunit)
+            .iter()
+            .map(|t| t.sym.name.clone())
+            .collect()
+    }
+
+    pub fn available_generics(&self, cpunit: &CompilationUnit) -> Vec<Rc<NamedGenericType>> {
+        let files = self.files_needed_to_resolve_current_file(cpunit);
+        files
+            .flat_map(|file| {
+                file.borrow()
+                    .defined_generics()
+                    .into_iter()
+                    .filter(|t| t.sym.is_exported)
+            })
+            .chain(self.defined_generics())
+            .collect::<Vec<_>>()
+    }
+
+    pub fn available_generic_names(&self, cpunit: &CompilationUnit) -> Vec<String> {
+        self.available_generics(cpunit)
+            .iter()
+            .map(|g| g.sym.name.clone())
+            .collect()
     }
 }
 

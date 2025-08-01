@@ -12,6 +12,8 @@ pub struct CompilationUnit {
     pub parser: RefCell<tree_sitter::Parser>,
     pub filecache: RefCell<HashMap<PathBuf, Rc<RefCell<NimFile>>>>,
     pub compilation_flags: HashMap<String, String>,
+
+    system_path: Option<PathBuf>,
 }
 
 impl CompilationUnit {
@@ -28,14 +30,22 @@ impl CompilationUnit {
             parser: RefCell::new(parser),
             filecache: RefCell::new(HashMap::new()),
             compilation_flags: HashMap::new(),
+            system_path: if with_system {
+                installation::get_system_lib_path()
+            } else {
+                None
+            },
         };
         if with_system {
-            let system_path = installation::get_system_lib_path();
-            if let Some(system_path) = system_path {
-                cu.query_file(&system_path, None);
+            if let Some(system_path) = &cu.system_path {
+                cu.query_file(system_path, None);
             }
         }
         cu
+    }
+
+    pub fn get_system_path(&self) -> Option<&PathBuf> {
+        self.system_path.as_ref()
     }
 
     pub fn new_with_flags(with_system: bool, compilation_flags: HashMap<String, String>) -> Self {

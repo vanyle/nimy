@@ -12,18 +12,17 @@ fn main() {
         .expect("Failed to canonicalize path");
     let file = include_str!("../scratchpad.nim");
 
-    let compilation_unit = CompilationUnit::new(false);
+    let compilation_unit = CompilationUnit::new(true);
     let nim_file = compilation_unit.query_file(&path, Some(file.as_bytes()));
 
     let nim_file = nim_file.borrow();
-    let root_scope = &nim_file.root_scope.borrow();
-    println!("Parsed types:");
-    for t in &root_scope.types {
+    println!("Available types:");
+    for t in &nim_file.available_types(&compilation_unit) {
         println!("  {t}");
     }
 
-    println!("Parsed generics:");
-    for t in &root_scope.generic_types {
+    println!("Available generics:");
+    for t in &nim_file.available_generics(&compilation_unit) {
         println!("  {t}");
     }
 }
