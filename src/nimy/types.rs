@@ -16,7 +16,7 @@ pub enum NimType {
     Alias(Rc<str>), // not a symbol here as an alias is not yet resolved
     AliasGeneric(Rc<str>, Vec<Rc<NimType>>), // an alias to a generic instanciation, like `Bluck[int]`
     Magic(Rc<Symbol>), // represents a magic defined type, like int8 or cstring
-    MagicGeneric(Rc<Symbol>, Vec<Rc<NimType>>), // represents a magic defined type that is generic, like sink
+    MagicGeneric(Rc<str>, Vec<Rc<NimType>>), // represents a magic defined type that is generic, like sink
     Undefined(Symbol),
     Ptr(Rc<NimType>),
     Ref(Rc<NimType>),
@@ -65,7 +65,7 @@ impl std::fmt::Display for NimType {
                 write!(
                     f,
                     "{}({})",
-                    name.name,
+                    name,
                     args.iter()
                         .map(|a| format!("{a}"))
                         .collect::<Vec<_>>()
@@ -119,23 +119,29 @@ impl std::fmt::Display for NimType {
             NimType::Object(object_type) => write!(f, "{object_type}"),
             NimType::ObjectVariant(variant_type) => write!(
                 f,
-                "object(case {}: {} of {})",
+                "object({}, case {}: {} of {})",
+                &variant_type
+                    .other_fields
+                    .iter()
+                    .map(|f| format!("{f}"))
+                    .collect::<Vec<_>>()
+                    .join(", "),
                 &variant_type.discriminator_name,
                 variant_type.discriminator,
                 variant_type
                     .branches
                     .iter()
-                    .map(|(name, fields)| {
+                    .map(|(names, fields)| {
                         format!(
                             "{}: {{{}}}",
-                            name,
+                            names.join(", "),
                             fields
                                 .iter()
                                 .map(|f| format!("{f}"))
                                 .collect::<Vec<_>>()
                                 .join(", ")
                         )
-                    })
+                    }) // TODO: display other_fields
                     .collect::<Vec<_>>()
                     .join(", "),
             ),
@@ -186,7 +192,9 @@ impl NimType {
                 variant_type
                     .branches
                     .iter()
-                    .flat_map(|(_, fields)| fields.iter().map(|f| &f.field_type)),
+                    .flat_map(|(_, fields)| fields.iter().map(|f| &f.field_type))
+                    .chain(iter::once(&variant_type.discriminator))
+                    .chain(variant_type.other_fields.iter().map(|f| &f.field_type)),
             ),
             NimType::GenericParameter(param) => Box::new(param.subtype_constraint.iter()),
             NimType::Int
@@ -227,20 +235,12 @@ pub fn is_type_cyclic(nim_type: Rc<NimType>) -> bool {
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct NimEnumType {
-    pub variants: Vec<Vec<u8>>,
+    pub variants: Vec<Rc<str>>,
 }
 
 impl std::fmt::Display for NimEnumType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "enum({})",
-            self.variants
-                .iter()
-                .map(|t| String::from_utf8_lossy(t))
-                .collect::<Vec<_>>()
-                .join(", ")
-        )
+        write!(f, "enum({})", self.variants.join(", "))
     }
 }
 
@@ -261,15 +261,15 @@ impl std::fmt::Display for NimObjectType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "object({} of {})",
+            "object of {}({})",
+            self.parent
+                .as_ref()
+                .map_or("root".to_string(), |p| format!("{p}").to_string()),
             self.fields
                 .iter()
                 .map(|f| format!("{f}"))
                 .collect::<Vec<_>>()
-                .join(", "),
-            self.parent
-                .as_ref()
-                .map_or("root".to_string(), |p| format!("{p}").to_string())
+                .join(", ")
         )
     }
 }
@@ -305,8 +305,9 @@ impl std::fmt::Display for NimObjectField {
 #[derive(Debug, Eq, PartialEq)]
 pub struct NimObjectVariantType {
     pub discriminator_name: String,
-    pub discriminator: NimEnumType,
-    pub branches: Vec<(String, Vec<NimObjectField>)>,
+    pub discriminator: Rc<NimType>, // should be an enum to be valid
+    pub branches: Vec<(Vec<String>, Vec<NimObjectField>)>,
+    pub other_fields: Vec<NimObjectField>,
 }
 #[derive(Debug, Eq, PartialEq)]
 pub struct NimProcType {

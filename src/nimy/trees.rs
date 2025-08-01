@@ -377,6 +377,7 @@ pub enum NodeKind {
     LBraceDot,
     RBrace,
     Unknown,
+    Error,
 }
 
 #[allow(unreachable_code)]
@@ -573,6 +574,11 @@ pub fn kind_to_enum(kind: &str) -> NodeKind {
         ";" => NodeKind::Semicolon,
         "{." => NodeKind::LBraceDot, // pragmas
         ".}" => NodeKind::DotRBrace,
+        "##" => NodeKind::HashHash, // Doc comment
+        "#[" => NodeKind::HashLBracket,
+        "]#" => NodeKind::RBracketHash,
+        "#" => NodeKind::Hash,
+        "ERROR" => NodeKind::Error,
         _ => {
             panic!("Unknown node kind: {kind}");
             NodeKind::Unknown

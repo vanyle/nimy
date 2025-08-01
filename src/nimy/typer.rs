@@ -1,3 +1,4 @@
+use core::panic;
 use std::{
     cell::RefCell,
     ops::Deref,
@@ -12,7 +13,7 @@ use crate::nimy::{
     sourcefiles::{self, FileReferences},
     trees::NodeKind,
     type_constraints::NimTypeClass,
-    types::{self, GenericParameterType, NimTupleType},
+    types::{self, GenericParameterType, NimEnumType, NimTupleType},
 };
 
 use crate::nimy::{
@@ -66,7 +67,7 @@ impl<'a> Scope {
         path: &Rc<PathBuf>,
         content: &[u8],
     ) -> Self {
-        println!("fs: {}", path.display());
+        // println!("fs: {}", path.display());
         let root = trees::ParseNode::new(*node, content, path);
 
         let start = node.start_byte();
@@ -89,8 +90,20 @@ impl<'a> Scope {
         result
     }
 
-    pub fn available_types(&self) -> Vec<String> {
-        self.borrow().available_types()
+    /// Return a list of the names of the concrete types defined in the scope
+    pub fn defined_type_names(&self) -> Vec<String> {
+        self.borrow().defined_type_names().collect()
+    }
+    pub fn defined_types(&self) -> Vec<Rc<NamedRegularType>> {
+        self.borrow().defined_types().collect()
+    }
+
+    /// Return a list of the names of the generic types defined in the scope
+    pub fn defined_generic_names(&self) -> Vec<String> {
+        self.borrow().defined_generic_names().collect()
+    }
+    pub fn defined_generics(&self) -> Vec<Rc<NamedGenericType>> {
+        self.borrow().defined_generics().collect()
     }
 
     fn from_inner(inner: InnerScope) -> Self {
@@ -104,8 +117,17 @@ impl<'a> Scope {
 }
 
 impl InnerScope {
-    fn available_types(&self) -> Vec<String> {
-        self.types.iter().map(|t| t.sym.name.clone()).collect()
+    fn defined_type_names(&self) -> impl Iterator<Item = String> {
+        self.types.iter().map(|t| t.sym.name.clone())
+    }
+    fn defined_types(&self) -> impl Iterator<Item = Rc<NamedRegularType>> {
+        self.types.iter().cloned()
+    }
+    fn defined_generic_names(&self) -> impl Iterator<Item = String> {
+        self.generic_types.iter().map(|t| t.sym.name.clone())
+    }
+    fn defined_generics(&self) -> impl Iterator<Item = Rc<NamedGenericType>> {
+        self.generic_types.iter().cloned()
     }
 }
 
@@ -234,6 +256,35 @@ fn parse_symbol_declaration_list(node: &trees::ParseNode) -> Vec<Symbol> {
         .collect()
 }
 
+fn parse_fields(
+    fields: &trees::ParseNode,
+    cpunit: &CompilationUnit,
+    scope: &InnerScope,
+    generic_parameters: &[Rc<GenericParameterType>],
+) -> impl Iterator<Item = (Symbol, Rc<NimType>)> {
+    let kind = fields.kind;
+    assert!(
+        fields.kind == NodeKind::FieldDeclarationList || fields.kind == NodeKind::TupleType,
+        "Unexpected kind {kind:?}"
+    );
+    fields
+        .children()
+        .filter(|n| n.kind == NodeKind::FieldDeclaration)
+        .filter_map(|n| {
+            let symbols = n.get_by_kind(NodeKind::SymbolDeclarationList)?;
+            let type_expression = n.get_by_kind(NodeKind::TypeExpression)?;
+            let type_expression =
+                parse_type_expression(&type_expression, cpunit, scope, generic_parameters)?;
+            Some(
+                parse_symbol_declaration_list(&symbols)
+                    .iter()
+                    .map(|s| (s.clone(), type_expression.clone()))
+                    .collect::<Vec<_>>(),
+            )
+        })
+        .flatten()
+}
+
 fn parse_fields_from_tuple_construction(
     node: &trees::ParseNode,
     cpunit: &CompilationUnit,
@@ -241,34 +292,33 @@ fn parse_fields_from_tuple_construction(
     generic_parameters: &[Rc<GenericParameterType>],
 ) -> Vec<types::NimTupleField> {
     assert_eq!(node.kind, NodeKind::TupleType);
-    let fields = node.get_by_kind(NodeKind::FieldDeclarationList).unwrap();
-    let mut result = Vec::new();
+    // tuples can directly contain the list of fields with no field_list node
+    let fields = node
+        .get_by_kind(NodeKind::FieldDeclarationList)
+        .unwrap_or(*node);
+
+    let fields = parse_fields(&fields, cpunit, scope, generic_parameters);
     fields
-        .children()
-        .filter(|n| n.kind == NodeKind::FieldDeclaration)
-        .for_each(|n| {
-            let symbols = n.get_by_kind(NodeKind::SymbolDeclarationList);
-            let Some(symbols) = symbols else {
-                return;
-            };
-            let type_expression = n.get_by_kind(NodeKind::TypeExpression);
-            let Some(type_expression) = type_expression else {
-                return;
-            };
-            let type_expression =
-                parse_type_expression(&type_expression, cpunit, scope, generic_parameters);
-            let Some(type_expression) = type_expression else {
-                return;
-            };
-            let symbols = parse_symbol_declaration_list(&symbols);
-            for s in &symbols {
-                result.push(types::NimTupleField {
-                    sym: Some(s.clone()),
-                    field_type: type_expression.clone(),
-                });
-            }
-        });
-    result
+        .map(|(sym, field_type)| types::NimTupleField {
+            sym: Some(sym),
+            field_type,
+        })
+        .collect()
+}
+
+fn parse_fields_from_object_construction(
+    node: &trees::ParseNode,
+    cpunit: &CompilationUnit,
+    scope: &InnerScope,
+    generic_parameters: &[Rc<GenericParameterType>],
+) -> Vec<types::NimObjectField> {
+    let Some(fields) = node.get_by_kind(NodeKind::FieldDeclarationList) else {
+        return vec![];
+    };
+    let fields = parse_fields(&fields, cpunit, scope, generic_parameters);
+    fields
+        .map(|(sym, field_type)| types::NimObjectField { sym, field_type })
+        .collect()
 }
 
 /// Given an identifier, return the type it represents.
@@ -401,6 +451,83 @@ fn parse_infix_operator_for_types(
     }
 }
 
+fn parse_variant_object_type(
+    cpunit: &CompilationUnit,
+    node: &trees::ParseNode,
+    scope: &InnerScope,
+    generic_parameters: &[Rc<GenericParameterType>],
+) -> Option<Rc<NimType>> {
+    assert_eq!(node.kind, NodeKind::ObjectDeclaration);
+    let fields = node.get_by_kind(NodeKind::FieldDeclarationList)?;
+    let regular_fields = parse_fields(&fields, cpunit, scope, generic_parameters)
+        .map(|(sym, field_type)| types::NimObjectField { sym, field_type })
+        .collect();
+    let variant_node = fields.get_by_kind(NodeKind::VariantDeclaration)?;
+    let discriminator_node = variant_node.get_by_kind(NodeKind::VariantDiscriminatorDeclaration)?;
+    let discriminator_name = discriminator_node
+        .child(0)?
+        .extract_by_kind(NodeKind::Identifier)?
+        .to_str();
+
+    let discriminator = parse_type_expression(
+        &discriminator_node.child(2)?,
+        cpunit,
+        scope,
+        generic_parameters,
+    )?;
+
+    let branches = variant_node
+        .children()
+        .filter(|n| n.kind == NodeKind::OfBranch)
+        .filter_map(|branch_node| {
+            let identifiers = branch_node
+                .get_by_kind(NodeKind::ExpressionList)?
+                .children()
+                .filter(|n| n.kind == NodeKind::Identifier)
+                .map(|n| n.to_str().to_string())
+                .collect::<Vec<_>>();
+            let fields = parse_fields_from_object_construction(
+                &branch_node,
+                cpunit,
+                scope,
+                generic_parameters,
+            );
+            Some((identifiers, fields))
+        })
+        .collect::<Vec<_>>();
+
+    Some(Rc::new(NimType::ObjectVariant(
+        types::NimObjectVariantType {
+            other_fields: regular_fields,
+            discriminator_name,
+            discriminator,
+            branches,
+        },
+    )))
+}
+
+fn parse_object_type(
+    cpunit: &CompilationUnit,
+    node: &trees::ParseNode,
+    scope: &InnerScope,
+    generic_parameters: &[Rc<GenericParameterType>],
+) -> Option<Rc<NimType>> {
+    let inherits = node
+        .child(1)
+        .map(|n| n.kind == NodeKind::Of)
+        .unwrap_or(false);
+    let parent_type = if inherits {
+        node.child(2)
+            .and_then(|n| parse_type_expression(&n, cpunit, scope, generic_parameters))
+    } else {
+        None
+    };
+    Some(Rc::new(NimType::Object(types::NimObjectType {
+        fields: parse_fields_from_object_construction(node, cpunit, scope, generic_parameters),
+        parent: parent_type,
+    })))
+}
+
 fn parse_type_expression(
     node: &trees::ParseNode,
     cpunit: &CompilationUnit,
@@ -408,6 +535,14 @@ fn parse_type_expression(
     generic_parameters: &[Rc<GenericParameterType>],
 ) -> Option<Rc<NimType>> {
     match node.kind {
+        NodeKind::EnumDeclaration => {
+            let enum_fields = node
+                .children()
+                .filter(|n| n.kind == NodeKind::EnumFieldDeclaration);
+            Some(Rc::new(NimType::Enum(NimEnumType {
+                variants: enum_fields.map(|n| n.to_str().into()).collect(),
+            })))
+        }
         NodeKind::TupleConstruction => {
             println!(
                 "TupleConstruction not implemented while parsing {}",
@@ -416,11 +551,12 @@ fn parse_type_expression(
             None
         }
         NodeKind::ObjectDeclaration => {
-            println!(
-                "ObjectDeclaration not implemented while parsing {}",
-                node.loc()
-            );
-            None
+            let is_variant = node.extract_by_kind(NodeKind::VariantDeclaration).is_some();
+            if is_variant {
+                parse_variant_object_type(cpunit, node, scope, generic_parameters)
+            } else {
+                parse_object_type(cpunit, node, scope, generic_parameters)
+            }
         }
         // Resolve identifier as "Alias" to present cyclic types
         NodeKind::Identifier => Some(resolve_type_using_aliases(
@@ -455,8 +591,38 @@ fn parse_type_expression(
         NodeKind::TupleType => Some(Rc::new(NimType::Tuple(NimTupleType {
             fields: parse_fields_from_tuple_construction(node, cpunit, scope, generic_parameters),
         }))),
+        NodeKind::VarType => {
+            let in_var =
+                parse_type_expression(&node.child(1).unwrap(), cpunit, scope, generic_parameters);
+            in_var.map(|t| Rc::new(NimType::Var(t)))
+        }
+        NodeKind::RefType => {
+            let in_ref =
+                parse_type_expression(&node.child(1).unwrap(), cpunit, scope, generic_parameters);
+            in_ref.map(|t| Rc::new(NimType::Ref(t)))
+        }
+        NodeKind::OutType => {
+            let in_out =
+                parse_type_expression(&node.child(1).unwrap(), cpunit, scope, generic_parameters);
+            in_out.map(|t| Rc::new(NimType::MagicGeneric(Rc::from("out"), vec![t])))
+        }
+        NodeKind::Call => {
+            // For calls, the argument list only contains one element
+            let argument = node
+                .get_by_kind(NodeKind::ArgumentList)
+                .unwrap_or_else(|| panic!("No argument list in call (sink, lent, ...)"))
+                .child(0)
+                .unwrap_or_else(|| {
+                    panic!("Argument list is empty for type call (sink, lent, ...)")
+                });
+            let argument_type = parse_type_expression(&argument, cpunit, scope, generic_parameters);
+            argument_type.map(|t| {
+                let call_str = node.child(0).unwrap().to_str();
+                Rc::new(NimType::MagicGeneric(Rc::from(call_str.as_str()), vec![t]))
+            })
+        }
         _ => {
-            println!(
+            eprintln!(
                 "{:?} not implemented while parsing {}",
                 node.kind,
                 node.loc()
@@ -464,6 +630,18 @@ fn parse_type_expression(
             None
         }
     }
+}
+
+fn extract_doc(node: &trees::ParseNode) -> String {
+    let mut result = String::new();
+    if node.kind == NodeKind::CommentContent {
+        result.push_str(&node.to_str());
+    } else {
+        for child in node.children() {
+            result.push_str(&extract_doc(&child));
+        }
+    }
+    result
 }
 
 fn parse_type_declaration(
@@ -477,7 +655,14 @@ fn parse_type_declaration(
     let maybe_type_definition = node.child(2);
 
     let generic_param_list = type_symbol_declaration.get_by_kind(NodeKind::GenericParameterList);
-    let sym = parse_type_symbol_declaration(&type_symbol_declaration);
+    let mut sym = parse_type_symbol_declaration(&type_symbol_declaration);
+
+    if let Some(type_def) = maybe_type_definition {
+        let doc = extract_doc(&type_def);
+        if !doc.is_empty() {
+            sym.doc = Some(doc);
+        }
+    }
 
     if let Some(generic_param_list) = generic_param_list {
         let generic_arguments = generics::parse_generic_param_list(generic_param_list, |n| {

@@ -13,6 +13,11 @@
 		"editor.codeActionsOnSave": {
 			"source.organizeImports": "always",
 		},
+		"[nim]": {
+			"editor.formatOnSave": false,
+			// There is a bug in the nimvscode formatter.
+			// "editor.defaultFormatter": "nimsaem.nimvscode"
+		},
 	},
 	"launch": {
 		"version": "0.2.0",

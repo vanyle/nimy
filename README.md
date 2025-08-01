@@ -21,13 +21,14 @@ Moreover, Nimy tries to sort suggestions by relevance and take types into accoun
 
 ## TODOs
 
-- [ ] List types defined in a file
+- [x] List types defined in a file
   - [x] Basic types
   - [x] Generics
-  - [ ] Type classes
-  - [ ] Ref/var/sink/...
-  - [ ] Object, enums and tuples
-  - [ ] Object variants
+  - [x] Type classes
+  - [x] Ref/var/sink/...
+  - [x] Enums
+  - [x] Object variants
+  - [x] Object and tuples (with named fields)
 - [ ] `include` support
 - [ ] Support `when` with simple expressions (true and false)
 - [ ] Support `when` with:

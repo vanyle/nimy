@@ -56,7 +56,29 @@ pub fn is_subtype(subtype: &NimType, supertype: &NimType) -> bool {
     if subtype == supertype {
         return true;
     }
-    false
+    let NimType::TypeClass(super_type_class) = supertype else {
+        return false;
+    };
+    match super_type_class {
+        NimTypeClass::Auto => true, // Auto is a supertype of everything.
+        NimTypeClass::Range => matches!(
+            subtype,
+            NimType::Int | NimType::Range(..) | NimType::Enum(..)
+        ),
+        NimTypeClass::Ptr => matches!(subtype, NimType::Ptr(..)),
+        NimTypeClass::Ref => matches!(subtype, NimType::Ref(..)),
+        NimTypeClass::Var => matches!(subtype, NimType::Var(..)),
+        NimTypeClass::Distinct => matches!(subtype, NimType::Distinct(..)),
+        NimTypeClass::Object => matches!(subtype, NimType::Object(..)),
+        NimTypeClass::Tuple => matches!(subtype, NimType::Tuple(..)),
+        NimTypeClass::Enum => matches!(subtype, NimType::Enum(..)),
+        NimTypeClass::Proc => matches!(subtype, NimType::Proc(..)),
+        NimTypeClass::Array => matches!(subtype, NimType::Array(..)),
+        NimTypeClass::Set => matches!(subtype, NimType::Set(..)),
+        NimTypeClass::Seq => matches!(subtype, NimType::Seq(..)),
+        NimTypeClass::Iterator => true, // Not done.
+        NimTypeClass::Union(left, right) => is_subtype(subtype, left) || is_subtype(subtype, right),
+    }
 }
 
 #[cfg(test)]
@@ -75,7 +97,6 @@ mod tests {
         assert!(!is_subtype(&int_type, &float_type)); // In general, types are not subtypes of other types
     }
 
-    #[ignore]
     #[test]
     fn test_typeclass() {
         let int_type = str_to_type("int").unwrap();

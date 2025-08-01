@@ -237,6 +237,18 @@ fn find_and_replace_generics(
             Rc::new(NimType::ObjectVariant(types::NimObjectVariantType {
                 discriminator_name: variant.discriminator_name.clone(),
                 discriminator: variant.discriminator.clone(), // generics not allowed in the discriminator field.
+                other_fields: variant
+                    .other_fields
+                    .iter()
+                    .map(|f| types::NimObjectField {
+                        sym: f.sym.clone(),
+                        field_type: find_and_replace_generics(
+                            f.field_type.clone(),
+                            argument_names,
+                            arguments,
+                        ),
+                    })
+                    .collect(),
                 branches: variant
                     .branches
                     .iter()

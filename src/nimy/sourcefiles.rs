@@ -94,6 +94,15 @@ impl NimFile {
 
         self.tree = Some(tree.tree);
     }
+
+    /// Return a list of concrete types defined inside the file
+    pub fn defined_types(&self) -> Vec<String> {
+        self.root_scope.defined_type_names()
+    }
+
+    pub fn defined_generics(&self) -> Vec<String> {
+        self.root_scope.defined_generic_names()
+    }
 }
 
 fn parse_content<'a>(
