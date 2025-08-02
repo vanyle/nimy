@@ -41,6 +41,44 @@ fn create_magic_type(symbol: Symbol) -> Rc<NimType> {
     }
 }
 
+/// Extracts the actual type name from backtick-wrapped identifiers
+fn extract_type_name_from_backticks(name: &str) -> String {
+    if name.starts_with('`') && name.ends_with('`') {
+        name[1..name.len() - 1].to_string()
+    } else {
+        name.to_string()
+    }
+}
+
+/// Creates a magic generic type (either standard or MagicGeneric)
+fn create_magic_generic_type(
+    symbol: Symbol,
+    generic_params: Vec<Rc<GenericParameterType>>,
+) -> Rc<GenericType> {
+    let cleaned_name = extract_type_name_from_backticks(&symbol.name);
+
+    // Try to get a standard generic type first
+    if let Some(standard_generic) = generics::str_to_generic_type(&cleaned_name) {
+        standard_generic
+    } else {
+        // Create a MagicGeneric type for unknown generics
+        let type_args: Vec<Rc<NimType>> = generic_params
+            .iter()
+            .map(|param| Rc::new(NimType::GenericParameter(param.clone())))
+            .collect();
+
+        let underlying_type = Rc::new(NimType::MagicGeneric(
+            Rc::from(cleaned_name.as_str()),
+            type_args,
+        ));
+
+        Rc::new(GenericType {
+            underlying_type,
+            generics: generic_params,
+        })
+    }
+}
+
 fn parse_type_symbol_declaration(node: &trees::ParseNode) -> Symbol {
     let is_exported = node.extract_by_kind(NodeKind::ExportedSymbol).is_some();
     let name = node
@@ -440,9 +478,24 @@ pub fn parse_type_declaration(
         let generic_arguments = generics::parse_generic_param_list(generic_param_list, |n| {
             parse_type_expression(&n, cpunit, scope, &[])
         });
-        let underlying_type = maybe_type_definition
-            .and_then(|def| parse_type_expression(&def, cpunit, scope, &generic_arguments))
+        let underlying_type = if let Some(def) = maybe_type_definition {
+            parse_type_expression(&def, cpunit, scope, &generic_arguments)
+        } else if has_magic_pragma(&type_symbol_declaration) {
+            // This is a magic generic declaration like: seq*[T] {.magic: "Seq".}
+            return NamedType {
+                sym: sym.clone(),
+                content: MaybeGenericType::GenericType(create_magic_generic_type(
+                    sym,
+                    generic_arguments,
+                )),
+            };
+        } else {
+            None
+        };
+
+        let underlying_type = underlying_type
             .unwrap_or_else(|| Rc::new(types::to_undefined_type(&type_symbol_declaration)));
+
         let generic = Rc::new(GenericType {
             underlying_type,
             generics: generic_arguments,
