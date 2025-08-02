@@ -56,6 +56,7 @@ You can add `// THINK: ...` comments while working to remember pieces of code an
 
 After coding, run `cargo fmt` to format the codebase properly.
 In general, you should always finish your work with `cargo fmt` to ensure the code is clean and consistent.
+You should also run `cargo clippy --fix --allow-dirty` to automatically fix some style issues.
 
 ## Project-Specific Patterns
 

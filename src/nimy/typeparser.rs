@@ -11,6 +11,36 @@ use crate::nimy::{
     types::{self, GenericParameterType, NimEnumType, NimTupleType, NimType},
 };
 
+/// Checks if a node has a magic pragma
+fn has_magic_pragma(node: &trees::ParseNode) -> bool {
+    if let Some(pragma_list) = node.extract_by_kind(NodeKind::PragmaList) {
+        for child in pragma_list.children() {
+            // Check for colon_expression with "magic" as the left side
+            if child.kind == NodeKind::ColonExpression {
+                let children: Vec<_> = child.children().collect();
+                if children.len() >= 2 {
+                    let left = &children[0];
+                    if left.to_str() == "magic" {
+                        return true;
+                    }
+                }
+            }
+        }
+    }
+    false
+}
+
+/// Creates a NimType from a magic type symbol
+fn create_magic_type(symbol: Symbol) -> Rc<NimType> {
+    // Try to convert known type names to their standard NimType variants
+    if let Some(standard_type) = types::str_to_type(&symbol.name) {
+        standard_type
+    } else {
+        // For unknown magic types, create a Magic variant
+        Rc::new(NimType::Magic(Rc::new(symbol)))
+    }
+}
+
 fn parse_type_symbol_declaration(node: &trees::ParseNode) -> Symbol {
     let is_exported = node.extract_by_kind(NodeKind::ExportedSymbol).is_some();
     let name = node
@@ -425,8 +455,14 @@ pub fn parse_type_declaration(
         let type_val =
             maybe_type_definition.and_then(|def| parse_type_expression(&def, cpunit, scope, &[]));
 
-        let type_val =
-            type_val.unwrap_or_else(|| Rc::new(types::to_undefined_type(&type_symbol_declaration)));
+        let type_val = if let Some(type_val) = type_val {
+            type_val
+        } else if has_magic_pragma(&type_symbol_declaration) {
+            // This is a magic type declaration like: int* {.magic: Int.}
+            create_magic_type(sym.clone())
+        } else {
+            Rc::new(types::to_undefined_type(&type_symbol_declaration))
+        };
 
         NamedType {
             sym,
