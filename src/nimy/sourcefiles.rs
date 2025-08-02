@@ -3,8 +3,9 @@ use std::iter;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
+use crate::nimy::cpunit::CompilationUnit;
 use crate::nimy::namedtypes::{NamedGenericType, NamedRegularType};
-use crate::nimy::{cpunit::CompilationUnit, trees::ParseTree, typer::Scope};
+use crate::nimy::{scope::Scope, trees::ParseTree};
 
 /// Represents a parsed Nim file
 #[derive(Debug)]

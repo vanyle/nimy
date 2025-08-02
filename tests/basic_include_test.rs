@@ -29,12 +29,12 @@ fn it_resolves_includes() {
         nim_file.includes.0[0].exists(),
         "The first included file should exist"
     );
-    
+
     assert!(
         nim_file.includes.0[1].exists(),
         "The second included file should exist"
     );
-    
+
     assert!(
         nim_file.includes.0[2].exists(),
         "The third included file should exist"

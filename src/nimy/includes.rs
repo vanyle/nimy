@@ -3,9 +3,9 @@ use std::{path::PathBuf, rc::Rc};
 use crate::nimy::{
     cpunit::CompilationUnit,
     installation,
+    scope::InnerScope,
     sourcefiles::FileReferences,
     trees::{self, NodeKind},
-    typer::InnerScope,
 };
 
 /// Handle an include statement by extracting the paths and processing the files
@@ -26,12 +26,9 @@ pub fn handle_include_statement(
 
 /// Extract the file paths from an include statement node
 /// This returns a list of paths since include can have multiple paths: include "pathA", "pathB"
-fn extract_include_paths(
-    node: &trees::ParseNode,
-    current_file_path: &Rc<PathBuf>,
-) -> Vec<PathBuf> {
+fn extract_include_paths(node: &trees::ParseNode, current_file_path: &Rc<PathBuf>) -> Vec<PathBuf> {
     let mut paths = Vec::new();
-    
+
     // Include statements are typically: include "path/to/file" or include path/to/file
     // Get the second child which should contain the path expression(s)
     let path_expr = match node.children().nth(1) {
@@ -72,7 +69,10 @@ fn extract_single_path(
         | NodeKind::RawStringLiteral => {
             // For string literals, we need to extract the content between quotes
             // The string literal node should have a string_content child
-            if let Some(content_node) = node.children().find(|child| child.kind == NodeKind::StringContent) {
+            if let Some(content_node) = node
+                .children()
+                .find(|child| child.kind == NodeKind::StringContent)
+            {
                 content_node.to_str()
             } else {
                 // Fallback: remove quotes manually
@@ -173,7 +173,7 @@ fn process_include_tree(
 
         // Process the included content as if it were part of the current file
         // This directly merges the symbols into the current scope
-        super::typer::handle_top_level(
+        super::toplevel::handle_top_level(
             cpunit,
             &root_node,
             scope,

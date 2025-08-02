@@ -54,6 +54,9 @@ You can add `// THINK: ...` comments while working to remember pieces of code an
 - Uses `scratchpad.nim` as default test file in `main.rs`
 - Tests follow pattern: `{test_name}.nim` + `{test_name}.rs` pairs
 
+After coding, run `cargo fmt` to format the codebase properly.
+In general, you should always finish your work with `cargo fmt` to ensure the code is clean and consistent.
+
 ## Project-Specific Patterns
 
 ### File Organization

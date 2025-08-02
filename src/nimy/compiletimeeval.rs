@@ -1,7 +1,7 @@
 use crate::nimy::{
     cpunit::CompilationUnit,
+    scope::InnerScope,
     trees::{NodeKind, ParseNode},
-    typer::InnerScope,
     values::{NimValue, parse_literal},
 };
 

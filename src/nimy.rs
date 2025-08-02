@@ -23,9 +23,14 @@ pub mod symbols;
 /// Defines nim values
 pub mod values;
 
-/// Contains functions needed to convert from the tree-sitter AST
-/// to our own representation and datastructures
-pub mod typer;
+/// Scope management and symbol resolution
+pub mod scope;
+
+/// Top-level file processing and orchestration  
+pub mod toplevel;
+
+/// Type expression parsing and construction
+pub mod typeparser;
 
 /// Handles include statement processing and file inclusion
 pub mod includes;
