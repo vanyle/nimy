@@ -33,6 +33,22 @@ You can write Nim code in `scratchpad.nim` and run the parser on it with:
 cargo run
 ```
 
+You can debug the content of a tree-sitter node using the `dbg_par()` function that will
+print a representation of the node and its children.
+If you only want to print the childrens up to a certain depth, you can use the `dbg_par_depth(depth)` function:
+
+```rust
+fn handle_something(node: &trees::ParseNode) {
+    println!("{:?}", node.dbg_par());
+    // rest of the function
+}
+```
+
+### Comments
+
+Don't leave too many comments, prefer clear variable and function names.
+You can add `// THINK: ...` comments while working to remember pieces of code and logic, but you need to remove them afterwards.
+
 ### Key Commands
 
 - Uses `scratchpad.nim` as default test file in `main.rs`

@@ -145,6 +145,27 @@ impl<'a, 'tree> ParseNode<'a, 'tree> {
         self.dbg_indented(0, depth)
     }
 
+    pub fn dbg_par(&self) -> String {
+        self.dbg_par_with_max_depth(99)
+    }
+
+    pub fn dbg_par_with_max_depth(&self, depth: usize) -> String {
+        let kind = self.node.kind();
+        let children = self.children();
+        let has_children = self.child_count() > 0;
+        if depth == 0 {
+            return format!("{kind} (..omitted..)");
+        }
+        if !has_children {
+            return format!("{kind}(\"{}\")", String::from_utf8_lossy(self.to_u8()));
+        }
+        let children = children
+            .map(|c| c.dbg_par_with_max_depth(depth - 1))
+            .collect::<Vec<_>>()
+            .join(",");
+        format!("{kind} ({children})")
+    }
+
     pub fn loc(&self) -> String {
         let pos = self.node.start_position();
         format!("{}:{}:{}", self.path.display(), pos.row + 1, pos.column + 1)
@@ -590,6 +611,7 @@ pub fn kind_to_enum(kind: &str) -> NodeKind {
         "]#" => NodeKind::RBracketHash,
         "#" => NodeKind::Hash,
         "." => NodeKind::Dot,
+        "`" => NodeKind::Backtick,
         "ERROR" => NodeKind::Error,
         "\"" => NodeKind::DoubleQuote,
         "\"\"\"" => NodeKind::DoubleQuoteDoubleQuoteDoubleQuote,
