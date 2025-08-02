@@ -79,7 +79,7 @@ fn create_magic_generic_type(
     }
 }
 
-fn parse_type_symbol_declaration(node: &trees::ParseNode) -> Symbol {
+pub fn parse_type_symbol_declaration(node: &trees::ParseNode) -> Symbol {
     let is_exported = node.extract_by_kind(NodeKind::ExportedSymbol).is_some();
     let name = node
         .extract_by_kind(NodeKind::Identifier)

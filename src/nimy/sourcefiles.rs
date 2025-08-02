@@ -13,8 +13,6 @@ pub struct SourceFile {
     pub path: Rc<PathBuf>,
     pub last_updated: std::time::SystemTime,
 
-    pub tree: Option<tree_sitter::Tree>,
-
     pub includes: FileReferences,
     pub imports: FileReferences,
 
@@ -46,7 +44,6 @@ impl SourceFile {
         SourceFile {
             path,
             last_updated: std::time::SystemTime::now(),
-            tree: None,
             imports,
             includes,
             root_scope,
@@ -95,8 +92,6 @@ impl SourceFile {
             &self.path,
             new_content,
         );
-
-        self.tree = Some(tree.tree);
     }
 
     /// Return a list of concrete types defined inside the file
