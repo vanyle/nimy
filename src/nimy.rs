@@ -27,5 +27,8 @@ pub mod values;
 /// to our own representation and datastructures
 pub mod typer;
 
+/// Handles include statement processing and file inclusion
+pub mod includes;
+
 // Wrappers around tree_sitter
 pub mod trees;

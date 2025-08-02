@@ -119,7 +119,11 @@ pub fn get_lib_path(lib_name: &str) -> Option<PathBuf> {
 
 pub fn get_system_lib_path() -> Option<PathBuf> {
     let installation = get_nim_installation_info();
-    let sys_lib_path = installation.pkgs_path.join("system.nim");
+    let sys_lib_path = installation
+        .std_lib_paths
+        .iter()
+        .find(|p| p.ends_with("lib"))?;
+    let sys_lib_path = sys_lib_path.join("system.nim");
     if sys_lib_path.exists() {
         Some(sys_lib_path)
     } else {

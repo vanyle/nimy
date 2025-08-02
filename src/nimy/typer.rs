@@ -1,6 +1,7 @@
 use core::panic;
 use std::{
     cell::RefCell,
+    collections::HashMap,
     ops::Deref,
     path::PathBuf,
     rc::{Rc, Weak},
@@ -54,6 +55,9 @@ pub struct InnerScope {
 
     pub parent: Weak<RefCell<InnerScope>>,
     pub children: Vec<Scope>,
+
+    // Cache for included files - maps include path to parsed tree
+    pub include_cache: HashMap<PathBuf, tree_sitter::Tree>,
 }
 
 impl<'a> Scope {
@@ -64,12 +68,12 @@ impl<'a> Scope {
         node: &tree_sitter::Node<'a>,
         parent: Option<Scope>,
         imports: &mut sourcefiles::FileReferences,
-        _includes: &mut sourcefiles::FileReferences,
+        includes: &mut sourcefiles::FileReferences,
         path: &Rc<PathBuf>,
         content: &[u8],
     ) -> Self {
-        // println!("fs: {}", path.display());
-        let root = trees::ParseNode::new(*node, content, path);
+        println!("fs: {}", path.display());
+        let root: trees::ParseNode<'_, '_> = trees::ParseNode::new(*node, content, path);
 
         let start = node.start_byte();
         let end = node.end_byte();
@@ -84,10 +88,18 @@ impl<'a> Scope {
             procs: Vec::new(),
             parent: parent.map(|p| Rc::downgrade(&p.0)).unwrap_or_default(),
             children,
+            include_cache: HashMap::new(),
         };
 
         let result = Scope::from_inner(inner_scope);
-        handle_top_level(cpunit, &root, &mut result.borrow_mut(), imports);
+        handle_top_level(
+            cpunit,
+            &root,
+            &mut result.borrow_mut(),
+            imports,
+            includes,
+            path,
+        );
         result
     }
 
@@ -139,7 +151,7 @@ fn get_expression_list_from_import<'a, 'b>(
     node.children().nth(1).expect("Expected at least one child")
 }
 
-fn extract_import_paths(node: &trees::ParseNode, current_path: &str, result: &mut Vec<String>) {
+pub fn extract_import_paths(node: &trees::ParseNode, current_path: &str, result: &mut Vec<String>) {
     match node.kind {
         NodeKind::Identifier => {
             if current_path.is_empty() {
@@ -171,11 +183,13 @@ fn extract_import_paths(node: &trees::ParseNode, current_path: &str, result: &mu
 
 /// We assume that expression reordering is not allowed, aka that types, functions and imports
 /// are declared top to bottom and that a previous type is not allowed to refer to a later type.
-fn handle_top_level(
+pub fn handle_top_level(
     cpunit: &CompilationUnit,
     node: &trees::ParseNode,
     scope: &mut InnerScope,
     imports: &mut FileReferences,
+    includes: &mut FileReferences,
+    current_file_path: &Rc<PathBuf>,
 ) {
     for child in node.children() {
         match child.kind {
@@ -193,10 +207,21 @@ fn handle_top_level(
                         }
                     });
             }
+            NodeKind::IncludeStatement => {
+                crate::nimy::includes::handle_include_statement(
+                    cpunit,
+                    &child,
+                    scope,
+                    includes,
+                    current_file_path,
+                );
+            }
             NodeKind::TypeSection => {
                 handle_type_section(cpunit, &child, scope);
             }
-            NodeKind::When => handle_conditional(&child, cpunit, scope, imports),
+            NodeKind::When => {
+                handle_conditional(&child, cpunit, scope, imports, includes, current_file_path)
+            }
             _ => {}
         }
     }
@@ -207,6 +232,8 @@ fn handle_conditional(
     cpunit: &CompilationUnit,
     scope: &mut InnerScope,
     imports: &mut FileReferences,
+    includes: &mut FileReferences,
+    current_file_path: &Rc<PathBuf>,
 ) {
     assert!(matches!(
         node.kind,
@@ -239,7 +266,14 @@ fn handle_conditional(
     if is_truthy.unwrap_or(false) {
         let statements = children.get(3);
         if let Some(statements) = statements {
-            handle_top_level(cpunit, statements, scope, imports);
+            handle_top_level(
+                cpunit,
+                statements,
+                scope,
+                imports,
+                includes,
+                current_file_path,
+            );
         }
     } else {
         // else-if and else logic
@@ -252,7 +286,14 @@ fn handle_conditional(
                     if elif_val.is_truthy().unwrap_or(false) {
                         let statements = when_child.child(3);
                         if let Some(statements) = statements {
-                            handle_top_level(cpunit, &statements, scope, imports);
+                            handle_top_level(
+                                cpunit,
+                                &statements,
+                                scope,
+                                imports,
+                                includes,
+                                current_file_path,
+                            );
                         }
                         return; // We found a truthy elif branch, no need to check else.
                     }
@@ -260,7 +301,14 @@ fn handle_conditional(
                 NodeKind::ElseBranch => {
                     let statements = when_child.child(2);
                     if let Some(statements) = statements {
-                        handle_top_level(cpunit, &statements, scope, imports);
+                        handle_top_level(
+                            cpunit,
+                            &statements,
+                            scope,
+                            imports,
+                            includes,
+                            current_file_path,
+                        );
                     }
                     return;
                 }
@@ -611,10 +659,7 @@ fn parse_type_expression(
             })))
         }
         NodeKind::TupleConstruction => {
-            println!(
-                "TupleConstruction not implemented while parsing {}",
-                node.loc()
-            );
+            // TODO: TupleConstruction not implemented
             None
         }
         NodeKind::ObjectDeclaration => {

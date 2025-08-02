@@ -30,7 +30,7 @@ Moreover, Nimy tries to sort suggestions by relevance and take types into accoun
   - [x] Object variants
   - [x] Object and tuples (with named fields)
 - [x] Imports API
-- [ ] `include` support
+- [x] `include` support
 - [x] Support `when` with simple expressions (true and false)
 - [ ] Support `when` with:
     - [ ] `defined`

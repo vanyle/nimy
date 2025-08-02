@@ -11,7 +11,7 @@ pub fn evaluate_compile_time_expression(
     _cpunit: &CompilationUnit,
     _scope: &InnerScope,
 ) -> NimValue {
-    println!("Evaluating compile-time expression:\n{}", node.dbg_str());
+    // println!("Evaluating compile-time expression:\n{}", node.dbg_str());
     match node.kind {
         NodeKind::Identifier => {
             let identifier_name = node.to_str();
