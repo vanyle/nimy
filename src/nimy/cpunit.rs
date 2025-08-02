@@ -58,6 +58,8 @@ impl CompilationUnit {
     /// If no content is provided, the file is read to obtain the content.
     pub fn query_file(&self, path: &Path, content: Option<&[u8]>) -> Rc<RefCell<SourceFile>> {
         let nim_file = self.filecache.borrow_mut().get(path).cloned();
+        // We cannot use entries hashmap API to replace the if get == None then insert here because
+        // `new_from_file` can modify the hashmap leading to double mutable borrows.
         match nim_file {
             None => {
                 let new_file = Rc::new(RefCell::new(match content {
