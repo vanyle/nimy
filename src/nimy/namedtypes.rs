@@ -15,13 +15,13 @@ pub struct NamedType {
     pub sym: Symbol,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct NamedRegularType {
     pub content: Rc<NimType>,
     pub sym: Symbol,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct NamedGenericType {
     pub content: Rc<GenericType>,
     pub sym: Symbol,

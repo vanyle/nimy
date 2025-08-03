@@ -218,7 +218,6 @@ fn parse_type_from_bracket_expression(
 ) -> Option<Rc<NimType>> {
     assert_eq!(node.kind, NodeKind::BracketExpression);
     let generic_name = node.child(0).expect("Expected generic name").to_str();
-    let generic_type = resolve_generic_type(&generic_name, cpunit, scope)?;
     let arguments = node.get_by_kind(NodeKind::ArgumentList)?;
 
     let arguments = arguments
@@ -227,8 +226,17 @@ fn parse_type_from_bracket_expression(
         .filter_map(|id| parse_type_expression(&id, cpunit, scope, generic_parameters))
         .collect::<Vec<_>>();
 
-    let inst = generics::GenericInstanciation { arguments };
-    generics::instanciate_generic_type(&generic_type, &inst)
+    // Try to resolve the generic type immediately
+    if let Some(generic_type) = resolve_generic_type(&generic_name, cpunit, scope) {
+        let inst = generics::GenericInstanciation { arguments };
+        generics::instanciate_generic_type(&generic_type, &inst)
+    } else {
+        // Generic type not found, defer resolution using AliasGeneric
+        Some(Rc::new(NimType::AliasGeneric(
+            Rc::from(generic_name.as_str()),
+            arguments,
+        )))
+    }
 }
 
 fn parse_infix_operator_for_types(

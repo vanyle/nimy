@@ -3,6 +3,7 @@ use std::{path::PathBuf, rc::Rc};
 use crate::nimy::{
     compiletimeeval::evaluate_compile_time_expression,
     cpunit::CompilationUnit,
+    generics::{self, GenericType},
     installation,
     namedtypes::MaybeGenericType,
     namedtypes::{NamedGenericType, NamedRegularType},
@@ -10,6 +11,7 @@ use crate::nimy::{
     sourcefiles::FileReferences,
     trees::{self, NodeKind},
     typeparser,
+    types::NimType,
 };
 
 fn get_expression_list_from_import<'a, 'b>(
@@ -188,7 +190,7 @@ fn handle_conditional(
 
 /// Inside a type block, types are allowed to refer to one another.
 /// We need 2 pass. In the first pass, we build the types with placeholders and in the second pass,
-/// we resolve the "undefined" placeholders.
+/// we resolve the alias generics.
 fn handle_type_section(cpunit: &CompilationUnit, node: &trees::ParseNode, scope: &mut InnerScope) {
     let named_types = node
         .children()
@@ -196,21 +198,208 @@ fn handle_type_section(cpunit: &CompilationUnit, node: &trees::ParseNode, scope:
         .map(|child| typeparser::parse_type_declaration(cpunit, &child, scope))
         .collect::<Vec<_>>();
 
-    // Add types from within the block
+    // Separate regular and generic types for processing
+    let mut regular_types = Vec::new();
+    let mut generic_types = Vec::new();
+
     for t in named_types {
         match t.content {
             MaybeGenericType::GenericType(generic) => {
-                scope.generic_types.push(Rc::new(NamedGenericType {
+                generic_types.push(NamedGenericType {
                     sym: t.sym,
                     content: generic,
-                }));
+                });
             }
             MaybeGenericType::RegularType(regular) => {
-                scope.types.push(Rc::new(NamedRegularType {
+                regular_types.push(NamedRegularType {
                     sym: t.sym,
                     content: regular,
-                }));
+                });
             }
         }
     }
+
+    // Second pass: resolve deferred generic instantiations only for types in this type block
+    let (resolved_regular_types, resolved_generic_types) =
+        resolve_deferred_generics(cpunit, scope, regular_types, generic_types);
+
+    // Add resolved types to the scope
+    for regular_type in resolved_regular_types {
+        scope.types.push(Rc::new(regular_type));
+    }
+
+    for generic_type in resolved_generic_types {
+        scope.generic_types.push(Rc::new(generic_type));
+    }
+}
+
+/// Resolves AliasGeneric types for a specific list of types (i.e., within a type block)
+fn resolve_deferred_generics(
+    cpunit: &CompilationUnit,
+    scope: &InnerScope,
+    regular_types: Vec<NamedRegularType>,
+    generic_types: Vec<NamedGenericType>,
+) -> (Vec<NamedRegularType>, Vec<NamedGenericType>) {
+    let mut current_regular_types = regular_types;
+    let mut current_generic_types = generic_types;
+
+    // Keep track of resolved types to detect cycles
+    let mut resolved_any = true;
+    let mut max_iterations = current_regular_types.len() + current_generic_types.len() + 10;
+
+    while resolved_any && max_iterations > 0 {
+        resolved_any = false;
+        max_iterations -= 1;
+
+        // Resolve regular types
+        let new_regular_types: Vec<NamedRegularType> = current_regular_types
+            .iter()
+            .map(|regular_type| {
+                if let Some(new_content) = resolve_alias_generics_in_type_with_lists(
+                    &regular_type.content,
+                    cpunit,
+                    scope,
+                    &current_generic_types,
+                ) {
+                    resolved_any = true;
+                    NamedRegularType {
+                        sym: regular_type.sym.clone(),
+                        content: new_content,
+                    }
+                } else {
+                    regular_type.clone()
+                }
+            })
+            .collect();
+        current_regular_types = new_regular_types;
+
+        // Resolve generic types
+        let new_generic_types: Vec<NamedGenericType> = current_generic_types
+            .iter()
+            .map(|generic_type| {
+                if let Some(new_underlying) = resolve_alias_generics_in_type_with_lists(
+                    &generic_type.content.underlying_type,
+                    cpunit,
+                    scope,
+                    &current_generic_types,
+                ) {
+                    resolved_any = true;
+                    NamedGenericType {
+                        sym: generic_type.sym.clone(),
+                        content: Rc::new(GenericType {
+                            underlying_type: new_underlying,
+                            generics: generic_type.content.generics.clone(),
+                        }),
+                    }
+                } else {
+                    generic_type.clone()
+                }
+            })
+            .collect();
+        current_generic_types = new_generic_types;
+    }
+
+    if max_iterations == 0 {
+        eprintln!(
+            "Warning: Max iterations reached in resolve_deferred_generics. Possible cyclic dependencies."
+        );
+    }
+
+    (current_regular_types, current_generic_types)
+}
+
+/// Recursively resolves AliasGeneric types within a given type using type lists
+fn resolve_alias_generics_in_type_with_lists(
+    nim_type: &Rc<NimType>,
+    cpunit: &CompilationUnit,
+    scope: &InnerScope,
+    generic_types: &[NamedGenericType],
+) -> Option<Rc<NimType>> {
+    match nim_type.as_ref() {
+        NimType::AliasGeneric(generic_name, args) => {
+            // Try to resolve the generic type now
+            if let Some(generic_type) =
+                resolve_generic_type_with_lists(generic_name, cpunit, scope, generic_types)
+            {
+                // First, recursively resolve any AliasGeneric types in the arguments
+                let resolved_args: Vec<Rc<NimType>> = args
+                    .iter()
+                    .map(|arg| {
+                        resolve_alias_generics_in_type_with_lists(arg, cpunit, scope, generic_types)
+                            .unwrap_or_else(|| arg.clone())
+                    })
+                    .collect();
+
+                let inst = generics::GenericInstanciation {
+                    arguments: resolved_args,
+                };
+                generics::instanciate_generic_type(&generic_type, &inst)
+            } else {
+                // Still can't resolve, keep as AliasGeneric but try to resolve arguments
+                let resolved_args: Vec<Rc<NimType>> = args
+                    .iter()
+                    .map(|arg| {
+                        resolve_alias_generics_in_type_with_lists(arg, cpunit, scope, generic_types)
+                            .unwrap_or_else(|| arg.clone())
+                    })
+                    .collect();
+
+                if resolved_args
+                    .iter()
+                    .zip(args.iter())
+                    .any(|(new_arg, old_arg)| !Rc::ptr_eq(new_arg, old_arg))
+                {
+                    Some(Rc::new(NimType::AliasGeneric(
+                        generic_name.clone(),
+                        resolved_args,
+                    )))
+                } else {
+                    None // No change
+                }
+            }
+        }
+        _ => {
+            // Use the map function to recursively resolve children
+            let mapped_type = nim_type.map(|child_type| {
+                resolve_alias_generics_in_type_with_lists(child_type, cpunit, scope, generic_types)
+                    .unwrap_or_else(|| child_type.clone())
+            });
+
+            // Check if anything changed by comparing pointer equality
+            if Rc::ptr_eq(nim_type, &mapped_type) {
+                None // No change
+            } else {
+                Some(mapped_type)
+            }
+        }
+    }
+}
+
+/// Helper function to resolve generic types using type lists instead of scope
+fn resolve_generic_type_with_lists(
+    generic_name: &str,
+    _cpunit: &CompilationUnit,
+    scope: &InnerScope,
+    generic_types: &[NamedGenericType],
+) -> Option<Rc<GenericType>> {
+    // Check for well known names
+    if let Some(t) = generics::str_to_generic_type(generic_name) {
+        return Some(t);
+    }
+
+    // Check in the provided generic types list (current type block)
+    for generic in generic_types {
+        if generic.sym.name == generic_name {
+            return Some(generic.content.clone());
+        }
+    }
+
+    // Check for locally defined names in scope (parent scopes)
+    for generic in &scope.generic_types {
+        if generic.sym.name == generic_name {
+            return Some(generic.content.clone());
+        }
+    }
+
+    None
 }

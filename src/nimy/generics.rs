@@ -2,8 +2,8 @@ use std::{cell::LazyCell, rc::Rc};
 
 use crate::nimy::{
     trees::{NodeKind, ParseNode},
-    type_constraints::{self, NimTypeClass},
-    types::{self, GenericParameterType, NimType},
+    type_constraints::{self},
+    types::{GenericParameterType, NimType},
 };
 
 #[derive(Debug)]
@@ -124,7 +124,7 @@ fn find_and_replace_generics(
             })
             .unwrap_or_else(|| type_with_generic_param.clone()),
         _ => type_with_generic_param
-            .map(|t| find_and_replace_generics(&t, argument_names, arguments)),
+            .map(|t| find_and_replace_generics(t, argument_names, arguments)),
     }
 }
 
