@@ -31,15 +31,18 @@ Moreover, Nimy tries to sort suggestions by relevance and take types into accoun
   - [x] Object and tuples (with named fields)
 - [x] Imports API
 - [x] `include` support
-- [ ] Inference of dependent generic types defined in the same type block, even out-of-order
+- [x] Inference of dependent generic types defined in the same type block, even out-of-order
 - [ ] Support `when` with:
-    - [ ] Simple expressions (true and false)
+    - [x] Simple expressions (true and false)
     - [ ] `defined`
     - [ ] Boolean operators
     - [ ] Comparison operators
     - [ ] Compilation flags
     - [ ] current_platform / current_os
 - [ ] List procedures defined in a file
+  - [x] List procedure names
+  - [ ] Properly infer procedure types
+  - [ ] Handle generic procedures
 - [ ] Type inference for variables
   - [ ] Variables with explicit type hint
   - [ ] Variables with no type hint

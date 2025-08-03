@@ -123,8 +123,9 @@ fn find_and_replace_generics(
                 }
             })
             .unwrap_or_else(|| type_with_generic_param.clone()),
-        _ => type_with_generic_param
-            .map(|t| find_and_replace_generics(t, argument_names, arguments)),
+        _ => {
+            type_with_generic_param.map(|t| find_and_replace_generics(t, argument_names, arguments))
+        }
     }
 }
 

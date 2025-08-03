@@ -5,6 +5,7 @@ use std::rc::Rc;
 
 use crate::nimy::cpunit::CompilationUnit;
 use crate::nimy::namedtypes::{NamedGenericType, NamedRegularType};
+use crate::nimy::values::NimProc;
 use crate::nimy::{scope::Scope, trees::ParseTree};
 
 /// Represents a parsed Nim file
@@ -168,6 +169,30 @@ impl SourceFile {
             .iter()
             .map(|g| g.sym.name.clone())
             .collect()
+    }
+
+    pub fn available_procs(&self, cpunit: &CompilationUnit) -> Vec<Rc<NimProc>> {
+        let files = self.files_needed_to_resolve_current_file(cpunit);
+        files
+            .flat_map(|file| {
+                file.borrow()
+                    .root_scope
+                    .borrow()
+                    .procs
+                    .iter()
+                    .filter(|p| p.sym.is_exported)
+                    .cloned()
+                    .collect::<Vec<_>>()
+            })
+            .chain(
+                self.root_scope
+                    .borrow()
+                    .procs
+                    .iter()
+                    .filter(|p| p.sym.is_exported)
+                    .cloned(),
+            )
+            .collect::<Vec<_>>()
     }
 }
 

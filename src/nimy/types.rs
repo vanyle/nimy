@@ -94,20 +94,7 @@ impl std::fmt::Display for NimType {
             }
             NimType::Seq(inner) => write!(f, "seq[{inner}]"),
             NimType::Set(inner) => write!(f, "set[{inner}]"),
-            NimType::Proc(proc_type) => write!(
-                f,
-                "proc({}): {}",
-                proc_type
-                    .arguments
-                    .iter()
-                    .map(|t| format!("{t}"))
-                    .collect::<Vec<_>>()
-                    .join(", "),
-                proc_type
-                    .return_type
-                    .as_ref()
-                    .map_or("void".to_string(), |t| format!("{t}"))
-            ),
+            NimType::Proc(proc_type) => write!(f, "{proc_type}"),
             NimType::Enum(enum_type) => write!(f, "{enum_type}"),
             NimType::Tuple(tuple_type) => write!(
                 f,
@@ -424,6 +411,24 @@ pub struct NimProcType {
     pub arguments: Vec<Rc<NimType>>,
     pub return_type: Option<Rc<NimType>>,
 }
+
+impl std::fmt::Display for NimProcType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "proc({}): {}",
+            self.arguments
+                .iter()
+                .map(|t| format!("{t}"))
+                .collect::<Vec<_>>()
+                .join(", "),
+            self.return_type
+                .as_ref()
+                .map_or("void".to_string(), |t| format!("{t}"))
+        )
+    }
+}
+
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct GenericParameterType {
     pub name: String,

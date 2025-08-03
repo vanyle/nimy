@@ -16,6 +16,12 @@ fn main() {
     let nim_file = compilation_unit.query_file(&path, Some(file.as_bytes()));
 
     let nim_file = nim_file.borrow();
+
+    println!("Available procs");
+    for proc in &nim_file.available_procs(&compilation_unit) {
+        println!("  {proc}");
+    }
+
     println!("Available types:");
     for t in &nim_file.available_types(&compilation_unit) {
         println!("  {t}");

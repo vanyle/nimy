@@ -11,6 +11,12 @@ pub struct NimProc {
     pub nimtype: NimProcType,
 }
 
+impl std::fmt::Display for NimProc {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} := {}", self.sym.name, self.nimtype)
+    }
+}
+
 #[derive(Debug, PartialEq, Clone)]
 pub enum NimValue {
     Int(i64),

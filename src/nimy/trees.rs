@@ -615,6 +615,7 @@ pub fn kind_to_enum(kind: &str) -> NodeKind {
         "ERROR" => NodeKind::Error,
         "\"" => NodeKind::DoubleQuote,
         "\"\"\"" => NodeKind::DoubleQuoteDoubleQuoteDoubleQuote,
+        "'" => NodeKind::Quote,
         _ => {
             panic!("Unknown node kind: {kind}");
             NodeKind::Unknown

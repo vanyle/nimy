@@ -5,13 +5,14 @@ use crate::nimy::{
     cpunit::CompilationUnit,
     generics::{self, GenericType},
     installation,
-    namedtypes::MaybeGenericType,
-    namedtypes::{NamedGenericType, NamedRegularType},
+    namedtypes::{MaybeGenericType, NamedGenericType, NamedRegularType},
     scope::InnerScope,
     sourcefiles::FileReferences,
+    symbols::Symbol,
     trees::{self, NodeKind},
-    typeparser,
-    types::NimType,
+    typeparser::{self, parse_type_expression},
+    types::{self, NimType},
+    values::NimProc,
 };
 
 fn get_expression_list_from_import<'a, 'b>(
@@ -62,6 +63,7 @@ pub fn handle_top_level(
     current_file_path: &Rc<PathBuf>,
 ) {
     for child in node.children() {
+        // println!("Top level node: \n{}", &child.dbg_str());
         match child.kind {
             NodeKind::ImportStatement => {
                 let expr_list = get_expression_list_from_import(child);
@@ -92,9 +94,59 @@ pub fn handle_top_level(
             NodeKind::When => {
                 handle_conditional(&child, cpunit, scope, imports, includes, current_file_path)
             }
+            NodeKind::ProcDeclaration => handle_proc_declaration(&child, scope, cpunit),
             _ => {}
         }
     }
+}
+
+fn handle_proc_declaration(
+    node: &trees::ParseNode,
+    scope: &mut InnerScope,
+    cpunit: &CompilationUnit,
+) {
+    // println!("Procedure: \n{}", &node.dbg_str());
+    let maybe_exported = node.child(1).expect("at least 2 children in proc decl");
+    let is_exported = node.extract_by_kind(NodeKind::ExportedSymbol).is_some();
+
+    // MARK: generic proc
+
+    let proc_name_sym_node = maybe_exported
+        .extract_by_kind(NodeKind::Identifier)
+        .unwrap_or(maybe_exported);
+
+    // let generic_params = node.get_by_kind(NodeKind::GenericParameterList);
+    let parameters = node.get_by_kind(NodeKind::ParameterDeclarationList);
+    let parameters = match parameters {
+        None => vec![],
+        Some(parameters_node) => parameters_node
+            .children()
+            .filter(|n| n.kind == NodeKind::ParameterDeclaration)
+            .filter_map(|param_decl_node| {
+                // for now, extract just the types of the argument, not the names.
+                param_decl_node.get_by_kind(NodeKind::TypeExpression)
+            })
+            .map(|type_expr_nodes| {
+                parse_type_expression(&type_expr_nodes, cpunit, scope, &[])
+                    .unwrap_or(Rc::new(types::to_undefined_type(&type_expr_nodes)))
+            })
+            .collect::<Vec<_>>(),
+    };
+
+    let return_type_node = node
+        .children()
+        .skip_while(|n| n.kind != NodeKind::Colon)
+        .nth(1);
+    let return_type =
+        return_type_node.and_then(|node| parse_type_expression(&node, cpunit, scope, &[]));
+
+    scope.procs.push(Rc::new(NimProc {
+        sym: Symbol::from_node(&proc_name_sym_node, is_exported),
+        nimtype: types::NimProcType {
+            arguments: parameters,
+            return_type,
+        },
+    }));
 }
 
 fn handle_conditional(
@@ -300,9 +352,9 @@ fn resolve_deferred_generics(
     }
 
     if max_iterations == 0 {
-        eprintln!(
-            "Warning: Max iterations reached in resolve_deferred_generics. Possible cyclic dependencies."
-        );
+        //eprintln!(
+        //    "Warning: Max iterations reached in resolve_deferred_generics. Possible cyclic dependencies."
+        //);
     }
 
     (current_regular_types, current_generic_types)
