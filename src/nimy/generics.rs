@@ -105,27 +105,13 @@ where
 /// This can panic if `type_with_generic_param` contains generic variables that
 /// are not inside `argument_names`.
 fn find_and_replace_generics(
-    type_with_generic_param: Rc<NimType>,
+    type_with_generic_param: &Rc<NimType>,
     argument_names: &[Rc<GenericParameterType>],
     arguments: &[Rc<NimType>],
 ) -> Rc<NimType> {
     assert_eq!(argument_names.len(), arguments.len());
 
     match type_with_generic_param.as_ref() {
-        NimType::Int
-        | NimType::Bool
-        | NimType::Float
-        | NimType::TypeOfNil
-        | NimType::String
-        | NimType::Untyped
-        | NimType::Alias(..)
-        | NimType::AliasGeneric(..)
-        | NimType::Magic(..)
-        | NimType::Undefined(..)
-        | NimType::Enum(..)
-        | NimType::Range(..)
-        | NimType::Typedesc
-        | NimType::Typed => type_with_generic_param,
         NimType::GenericParameter(param_type) => argument_names
             .iter()
             .zip(arguments)
@@ -137,147 +123,8 @@ fn find_and_replace_generics(
                 }
             })
             .unwrap_or_else(|| type_with_generic_param.clone()),
-        NimType::Array(r, t) => {
-            let new_r = find_and_replace_generics(r.clone(), argument_names, arguments);
-            let new_t = find_and_replace_generics(t.clone(), argument_names, arguments);
-            Rc::new(NimType::Array(new_r, new_t))
-        }
-        NimType::Seq(t) => {
-            let new_t = find_and_replace_generics(t.clone(), argument_names, arguments);
-            Rc::new(NimType::Seq(new_t))
-        }
-        NimType::Ptr(t) => {
-            let new_t = find_and_replace_generics(t.clone(), argument_names, arguments);
-            Rc::new(NimType::Ptr(new_t))
-        }
-        NimType::Set(t) => {
-            let new_t = find_and_replace_generics(t.clone(), argument_names, arguments);
-            Rc::new(NimType::Set(new_t))
-        }
-        NimType::OpenArray(t) => {
-            let new_t = find_and_replace_generics(t.clone(), argument_names, arguments);
-            Rc::new(NimType::OpenArray(new_t))
-        }
-        NimType::Distinct(t) => {
-            let new_t = find_and_replace_generics(t.clone(), argument_names, arguments);
-            Rc::new(NimType::Distinct(new_t))
-        }
-        NimType::Ref(t) => {
-            let new_t = find_and_replace_generics(t.clone(), argument_names, arguments);
-            Rc::new(NimType::Ref(new_t))
-        }
-        NimType::Var(t) => {
-            let new_t = find_and_replace_generics(t.clone(), argument_names, arguments);
-            Rc::new(NimType::Var(new_t))
-        }
-        NimType::MagicGeneric(name, args) => {
-            let new_args = args
-                .iter()
-                .map(|a| find_and_replace_generics(a.clone(), argument_names, arguments))
-                .collect();
-            Rc::new(NimType::MagicGeneric(name.clone(), new_args))
-        }
-        NimType::Proc(proc_type) => {
-            let new_args = proc_type
-                .arguments
-                .iter()
-                .map(|a| find_and_replace_generics(a.clone(), argument_names, arguments))
-                .collect();
-            let new_return_type = proc_type
-                .return_type
-                .as_ref()
-                .map(|t| find_and_replace_generics(t.clone(), argument_names, arguments));
-            Rc::new(NimType::Proc(types::NimProcType {
-                arguments: new_args,
-                return_type: new_return_type,
-            }))
-        }
-        NimType::Tuple(tuple_type) => {
-            let new_fields = tuple_type
-                .fields
-                .iter()
-                .map(|field| types::NimTupleField {
-                    sym: field.sym.clone(),
-                    field_type: find_and_replace_generics(
-                        field.field_type.clone(),
-                        argument_names,
-                        arguments,
-                    ),
-                })
-                .collect();
-            Rc::new(NimType::Tuple(types::NimTupleType { fields: new_fields }))
-        }
-        NimType::Object(obj_type) => {
-            let new_fields = obj_type
-                .fields
-                .iter()
-                .map(|field| types::NimObjectField {
-                    sym: field.sym.clone(),
-                    field_type: find_and_replace_generics(
-                        field.field_type.clone(),
-                        argument_names,
-                        arguments,
-                    ),
-                })
-                .collect();
-            let parent = obj_type
-                .parent
-                .as_ref()
-                .map(|p| find_and_replace_generics(p.clone(), argument_names, arguments));
-            Rc::new(NimType::Object(types::NimObjectType {
-                fields: new_fields,
-                parent,
-            }))
-        }
-        NimType::Varargs(arg_type, is_stringifiable) => {
-            let new_arg_type =
-                find_and_replace_generics(arg_type.clone(), argument_names, arguments);
-            Rc::new(NimType::Varargs(new_arg_type, *is_stringifiable))
-        }
-        NimType::ObjectVariant(variant) => {
-            Rc::new(NimType::ObjectVariant(types::NimObjectVariantType {
-                discriminator_name: variant.discriminator_name.clone(),
-                discriminator: variant.discriminator.clone(), // generics not allowed in the discriminator field.
-                other_fields: variant
-                    .other_fields
-                    .iter()
-                    .map(|f| types::NimObjectField {
-                        sym: f.sym.clone(),
-                        field_type: find_and_replace_generics(
-                            f.field_type.clone(),
-                            argument_names,
-                            arguments,
-                        ),
-                    })
-                    .collect(),
-                branches: variant
-                    .branches
-                    .iter()
-                    .map(|(name, fields)| {
-                        (
-                            name.clone(),
-                            fields
-                                .iter()
-                                .map(|f| types::NimObjectField {
-                                    sym: f.sym.clone(),
-                                    field_type: find_and_replace_generics(
-                                        f.field_type.clone(),
-                                        argument_names,
-                                        arguments,
-                                    ),
-                                })
-                                .collect(),
-                        )
-                    })
-                    .collect(),
-            }))
-        }
-        NimType::TypeClass(NimTypeClass::Union(lhs, rhs)) => {
-            let new_lhs = find_and_replace_generics(lhs.clone(), argument_names, arguments);
-            let new_rhs = find_and_replace_generics(rhs.clone(), argument_names, arguments);
-            Rc::new(NimType::TypeClass(NimTypeClass::Union(new_lhs, new_rhs)))
-        }
-        NimType::TypeClass(_) => type_with_generic_param,
+        _ => type_with_generic_param
+            .map(|t| find_and_replace_generics(&t, argument_names, arguments)),
     }
 }
 
@@ -308,7 +155,7 @@ pub fn instanciate_generic_type(
     // Build a new type by deep-cloning generic_type.underlying_type while
     // replacing the GenericParameter with the matching name by the types inside `inst`.
     Some(find_and_replace_generics(
-        generic_type.underlying_type.clone(),
+        &generic_type.underlying_type,
         &generic_type.generics,
         &inst.arguments,
     ))

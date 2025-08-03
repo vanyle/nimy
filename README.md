@@ -31,8 +31,8 @@ Moreover, Nimy tries to sort suggestions by relevance and take types into accoun
   - [x] Object and tuples (with named fields)
 - [x] Imports API
 - [x] `include` support
-- [x] Support `when` with simple expressions (true and false)
 - [ ] Support `when` with:
+    - [ ] Simple expressions (true and false)
     - [ ] `defined`
     - [ ] Boolean operators
     - [ ] Comparison operators
@@ -47,6 +47,7 @@ Moreover, Nimy tries to sort suggestions by relevance and take types into accoun
     - [ ] Suggest procedures based on their names
     - [ ] Suggest procedures in a method call syntax context using the type of the first argument
     - [ ] Suggest variables
+- [ ] Inference of dependent generic types defined in the same type block, even out-of-order
 - [ ] LSP integration for suggestions
 - [ ] VSCode integration
 - [ ] Generating errors

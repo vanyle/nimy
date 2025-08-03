@@ -1,9 +1,10 @@
-use std::{iter, rc::Rc};
+use std::{iter, ops::Deref, rc::Rc};
 
 use crate::nimy::{trees::ParseNode, type_constraints::NimTypeClass};
 
 use super::symbols::Symbol;
 
+/// Represents a type in Nim. Types are immutable and are always behind Rc.
 #[derive(Debug, Eq, PartialEq)]
 pub enum NimType {
     Int,
@@ -162,6 +163,100 @@ impl std::fmt::Display for NimType {
 }
 
 impl NimType {
+    /// Map a NimType to another NimType by applying a function to its children.
+    /// when f = id, this performs a shallow copy.
+    pub fn map<'a, F>(self: &Rc<Self>, mut f: F) -> Rc<Self>
+    where
+        F: FnMut(&Rc<NimType>) -> Rc<NimType> + 'a,
+    {
+        match self.deref() {
+            NimType::Ptr(inner) => Rc::new(NimType::Ptr(f(inner))),
+            NimType::Ref(inner) => Rc::new(NimType::Ref(f(inner))),
+            NimType::Var(inner) => Rc::new(NimType::Var(f(inner))),
+            NimType::Distinct(inner) => Rc::new(NimType::Distinct(f(inner))),
+            NimType::OpenArray(inner) => Rc::new(NimType::OpenArray(f(inner))),
+            NimType::Range(start, end) => Rc::new(NimType::Range(*start, *end)),
+            NimType::Array(range, inner) => Rc::new(NimType::Array(f(range), f(inner))),
+            NimType::Varargs(inner, is_dollar) => Rc::new(NimType::Varargs(f(inner), *is_dollar)),
+            NimType::Seq(inner) => Rc::new(NimType::Seq(f(inner))),
+            NimType::Set(inner) => Rc::new(NimType::Set(f(inner))),
+            NimType::Proc(proc_type) => Rc::new(NimType::Proc(NimProcType {
+                arguments: proc_type.arguments.iter().map(&mut f).collect(),
+                return_type: proc_type.return_type.as_ref().map(&mut f),
+            })),
+            NimType::AliasGeneric(name, args) => Rc::new(NimType::AliasGeneric(
+                name.clone(),
+                args.iter().map(&mut f).collect(),
+            )),
+            NimType::MagicGeneric(name, args) => Rc::new(NimType::MagicGeneric(
+                name.clone(),
+                args.iter().map(&mut f).collect(),
+            )),
+            NimType::Tuple(tuple_type) => Rc::new(NimType::Tuple(NimTupleType {
+                fields: tuple_type
+                    .fields
+                    .iter()
+                    .map(|field| NimTupleField {
+                        sym: field.sym.clone(),
+                        field_type: f(&field.field_type),
+                    })
+                    .collect(),
+            })),
+            NimType::Object(object_type) => Rc::new(NimType::Object(NimObjectType {
+                fields: object_type
+                    .fields
+                    .iter()
+                    .map(|field| field.map(&mut f))
+                    .collect(),
+                parent: object_type.parent.as_ref().map(&mut f),
+            })),
+            NimType::ObjectVariant(variant_type) => {
+                Rc::new(NimType::ObjectVariant(NimObjectVariantType {
+                    discriminator_name: variant_type.discriminator_name.clone(),
+                    discriminator: f(&variant_type.discriminator),
+                    branches: variant_type
+                        .branches
+                        .iter()
+                        .map(|(names, fields)| {
+                            (
+                                names.clone(),
+                                fields.iter().map(|field| field.map(&mut f)).collect(),
+                            )
+                        })
+                        .collect(),
+                    other_fields: variant_type
+                        .other_fields
+                        .iter()
+                        .map(|field| field.map(&mut f))
+                        .collect(),
+                }))
+            }
+            NimType::GenericParameter(param) => {
+                Rc::new(NimType::GenericParameter(Rc::new(GenericParameterType {
+                    name: param.name.clone(),
+                    subtype_constraint: param.subtype_constraint.as_ref().map(&mut f),
+                })))
+            }
+            NimType::TypeClass(NimTypeClass::Union(lhr, rhs)) => {
+                Rc::new(NimType::TypeClass(NimTypeClass::Union(f(lhr), f(rhs))))
+            }
+            NimType::TypeClass(_) => self.clone(),
+            NimType::Int
+            | NimType::Bool
+            | NimType::Float
+            | NimType::String
+            | NimType::Typed
+            | NimType::Alias(..)
+            | NimType::Enum(..)
+            | NimType::TypeOfNil
+            | NimType::Undefined(..)
+            | NimType::Magic(..)
+            | NimType::Untyped
+            | NimType::Typedesc => self.clone(),
+        }
+    }
+
+    /// Returns an iterator to the NimTypes contained inside this NimType.
     pub fn children<'a>(&'a self) -> Box<dyn Iterator<Item = &'a Rc<NimType>> + 'a> {
         match self {
             NimType::Ptr(inner) => Box::new(iter::once(inner)),
@@ -217,23 +312,23 @@ impl NimType {
             NimType::TypeClass(_) => Box::new(iter::empty()),
         }
     }
-}
 
-/// A type should never contain a cycle and if this returns true, it means that somebody messed up.
-/// A lot of our functions (including the display trait) assume acyclicity.
-pub fn is_type_cyclic(nim_type: Rc<NimType>) -> bool {
-    let mut seen = vec![];
-    let mut stack = vec![nim_type];
-    while let Some(current) = stack.pop() {
-        if seen.contains(&current) {
-            return true;
+    /// A type should never contain a cycle and if this returns true, it means that somebody messed up.
+    /// A lot of our functions (including the display trait) assume acyclicity.
+    pub fn is_type_cyclic(self: Rc<NimType>) -> bool {
+        let mut seen = vec![];
+        let mut stack = vec![self];
+        while let Some(current) = stack.pop() {
+            if seen.contains(&current) {
+                return true;
+            }
+            for child in current.children() {
+                stack.push((*child).clone());
+            }
+            seen.push(current);
         }
-        for child in current.children() {
-            stack.push((*child).clone());
-        }
-        seen.push(current);
+        false
     }
-    false
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -302,6 +397,18 @@ pub struct NimObjectField {
 impl std::fmt::Display for NimObjectField {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}: {}", &self.sym.name, self.field_type)
+    }
+}
+
+impl NimObjectField {
+    pub fn map<F>(&self, mut f: F) -> NimObjectField
+    where
+        F: FnMut(&Rc<NimType>) -> Rc<NimType>,
+    {
+        NimObjectField {
+            sym: self.sym.clone(),
+            field_type: f(&self.field_type),
+        }
     }
 }
 
