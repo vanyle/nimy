@@ -30,8 +30,10 @@ pub mod scope;
 /// Top-level file processing and orchestration  
 pub mod toplevel;
 
+pub mod procparser;
 /// Type expression parsing and construction
 pub mod typeparser;
+pub mod varparser;
 
 /// Handles include statement processing and file inclusion
 pub mod includes;
