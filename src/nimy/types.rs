@@ -131,7 +131,7 @@ impl std::fmt::Display for NimType {
                                 .collect::<Vec<_>>()
                                 .join(", ")
                         )
-                    }) // TODO: display other_fields
+                    })
                     .collect::<Vec<_>>()
                     .join(", "),
             ),
@@ -453,6 +453,7 @@ thread_local! {
     pub static STRING: Rc<NimType> = Rc::new(NimType::String);
     pub static TYPEDESC: Rc<NimType> = Rc::new(NimType::Typedesc);
     pub static TYPED: Rc<NimType> = Rc::new(NimType::Typed);
+    pub static UNTYPED: Rc<NimType> = Rc::new(NimType::Untyped);
 }
 
 /// Converts some string with well-known type names to their given type
@@ -464,6 +465,7 @@ pub fn str_to_type(s: &str) -> Option<Rc<NimType>> {
         "string" => Some(STRING.with(|f| f.clone())),
         "typedesc" => Some(TYPEDESC.with(|f| f.clone())),
         "typed" => Some(TYPED.with(|f| f.clone())),
+        "untyped" => Some(UNTYPED.with(|f| f.clone())),
         _ => None,
     }
 }

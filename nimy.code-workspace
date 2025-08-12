@@ -13,6 +13,11 @@
 		"editor.codeActionsOnSave": {
 			"source.organizeImports": "always",
 		},
+		"search.useIgnoreFiles": false,
+		"[rust]": {
+			"editor.formatOnSave": true,
+			"editor.defaultFormatter": "rust-lang.rust-analyzer"
+		},
 		"[nim]": {
 			"editor.formatOnSave": false,
 			// There is a bug in the nimvscode formatter.

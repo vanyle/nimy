@@ -33,24 +33,24 @@ Moreover, Nimy tries to sort suggestions by relevance and take types into accoun
 - [x] `include` support
 - [x] Inference of dependent generic types defined in the same type block, even out-of-order
 - [ ] Support `when` with:
-    - [x] Simple expressions (true and false)
-    - [ ] `defined`
-    - [ ] Boolean operators
-    - [ ] Comparison operators
-    - [ ] Compilation flags
-    - [ ] current_platform / current_os
-- [ ] List procedures defined in a file
+  - [x] Simple expressions (true and false)
+  - [ ] `defined`
+  - [ ] Boolean operators
+  - [ ] Comparison operators
+  - [ ] Compilation flags
+  - [ ] current_platform / current_os
+- [x] List procedures defined in a file
   - [x] List procedure names
-  - [ ] Properly infer procedure types
-  - [ ] Handle generic procedures
+  - [x] Properly infer procedure types
+  - [x] Handle generic procedures
 - [ ] Type inference for variables
   - [ ] Variables with explicit type hint
   - [ ] Variables with no type hint
 - [ ] Suggestions:
-    - [ ] Suggest types
-    - [ ] Suggest procedures based on their names
-    - [ ] Suggest procedures in a method call syntax context using the type of the first argument
-    - [ ] Suggest variables
+  - [ ] Suggest types
+  - [ ] Suggest procedures based on their names
+  - [ ] Suggest procedures in a method call syntax context using the type of the first argument
+  - [ ] Suggest variables
 - [ ] LSP integration for suggestions
 - [ ] VSCode integration
 - [ ] Generating errors

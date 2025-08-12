@@ -12,7 +12,7 @@ fn main() {
         .expect("Failed to canonicalize path");
     let file = include_str!("../scratchpad.nim");
 
-    let compilation_unit = CompilationUnit::new(true);
+    let compilation_unit = CompilationUnit::new(false);
     let nim_file = compilation_unit.query_file(&path, Some(file.as_bytes()));
 
     let nim_file = nim_file.borrow();
@@ -20,6 +20,11 @@ fn main() {
     println!("Available procs");
     for proc in &nim_file.available_procs(&compilation_unit) {
         println!("  {proc}");
+    }
+
+    println!("Available generic procs:");
+    for t in &nim_file.available_generic_procs(&compilation_unit) {
+        println!("  {t}");
     }
 
     println!("Available types:");

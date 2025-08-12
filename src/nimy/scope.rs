@@ -8,10 +8,12 @@ use std::{
 
 use crate::nimy::{
     cpunit::CompilationUnit,
+    generics::GenericProc,
+    namedprocs::NimProc,
     namedtypes::{NamedGenericType, NamedRegularType},
     sourcefiles, trees,
     types::{GenericParameterType, NimType},
-    values::{NimProc, NimVariable},
+    values::NimVariable,
 };
 
 #[derive(Debug)]
@@ -38,7 +40,9 @@ pub struct InnerScope {
     pub variables: Vec<Rc<NimVariable>>,
     pub types: Vec<Rc<NamedRegularType>>,
     pub generic_types: Vec<Rc<NamedGenericType>>,
+
     pub procs: Vec<Rc<NimProc>>,
+    pub generic_procs: Vec<Rc<GenericProc>>,
 
     pub parent: Weak<RefCell<InnerScope>>,
     pub children: Vec<Scope>,
@@ -73,6 +77,7 @@ impl<'a> Scope {
             types: Vec::new(),
             generic_types: Vec::new(),
             procs: Vec::new(),
+            generic_procs: Vec::new(),
             parent: parent.map(|p| Rc::downgrade(&p.0)).unwrap_or_default(),
             children,
             include_cache: HashMap::new(),

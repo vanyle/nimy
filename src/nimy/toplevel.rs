@@ -3,8 +3,9 @@ use std::{path::PathBuf, rc::Rc};
 use crate::nimy::{
     compiletimeeval::evaluate_compile_time_expression,
     cpunit::CompilationUnit,
-    generics::{self, GenericType},
+    generics::{self, GenericProc, GenericType},
     installation,
+    namedprocs::NimProc,
     namedtypes::{MaybeGenericType, NamedGenericType, NamedRegularType},
     scope::InnerScope,
     sourcefiles::FileReferences,
@@ -12,7 +13,6 @@ use crate::nimy::{
     trees::{self, NodeKind},
     typeparser::{self, parse_type_expression},
     types::{self, NimType},
-    values::NimProc,
 };
 
 fn get_expression_list_from_import<'a, 'b>(
@@ -105,17 +105,22 @@ fn handle_proc_declaration(
     scope: &mut InnerScope,
     cpunit: &CompilationUnit,
 ) {
-    // println!("Procedure: \n{}", &node.dbg_str());
     let maybe_exported = node.child(1).expect("at least 2 children in proc decl");
     let is_exported = node.extract_by_kind(NodeKind::ExportedSymbol).is_some();
-
-    // MARK: generic proc
 
     let proc_name_sym_node = maybe_exported
         .extract_by_kind(NodeKind::Identifier)
         .unwrap_or(maybe_exported);
 
-    // let generic_params = node.get_by_kind(NodeKind::GenericParameterList);
+    let generic_params = node.get_by_kind(NodeKind::GenericParameterList);
+    let generic_arguments = if let Some(generic_params) = generic_params {
+        generics::parse_generic_param_list(generic_params, |n| {
+            parse_type_expression(&n, cpunit, scope, &[])
+        })
+    } else {
+        vec![]
+    };
+
     let parameters = node.get_by_kind(NodeKind::ParameterDeclarationList);
     let parameters = match parameters {
         None => vec![],
@@ -127,7 +132,7 @@ fn handle_proc_declaration(
                 param_decl_node.get_by_kind(NodeKind::TypeExpression)
             })
             .map(|type_expr_nodes| {
-                parse_type_expression(&type_expr_nodes, cpunit, scope, &[])
+                parse_type_expression(&type_expr_nodes, cpunit, scope, &generic_arguments)
                     .unwrap_or(Rc::new(types::to_undefined_type(&type_expr_nodes)))
             })
             .collect::<Vec<_>>(),
@@ -140,13 +145,22 @@ fn handle_proc_declaration(
     let return_type =
         return_type_node.and_then(|node| parse_type_expression(&node, cpunit, scope, &[]));
 
-    scope.procs.push(Rc::new(NimProc {
+    let base_proc = Rc::new(NimProc {
         sym: Symbol::from_node(&proc_name_sym_node, is_exported),
         nimtype: types::NimProcType {
             arguments: parameters,
             return_type,
         },
-    }));
+    });
+
+    if generic_arguments.len() > 0 {
+        scope.generic_procs.push(Rc::new(GenericProc {
+            underlying_proc: base_proc,
+            generics: generic_arguments,
+        }));
+    } else {
+        scope.procs.push(base_proc);
+    }
 }
 
 fn handle_conditional(

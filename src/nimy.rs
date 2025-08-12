@@ -16,6 +16,7 @@ pub mod type_constraints;
 pub mod generics;
 
 pub mod namedtypes;
+pub mod namedprocs;
 
 /// Defines a symbol, which is a piece of string with a location in a file
 pub mod symbols;

@@ -4,8 +4,9 @@ use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
 use crate::nimy::cpunit::CompilationUnit;
+use crate::nimy::generics::GenericProc;
+use crate::nimy::namedprocs::NimProc;
 use crate::nimy::namedtypes::{NamedGenericType, NamedRegularType};
-use crate::nimy::values::NimProc;
 use crate::nimy::{scope::Scope, trees::ParseTree};
 
 /// Represents a parsed Nim file
@@ -184,14 +185,24 @@ impl SourceFile {
                     .cloned()
                     .collect::<Vec<_>>()
             })
-            .chain(
-                self.root_scope
+            .chain(self.root_scope.borrow().procs.iter().cloned())
+            .collect::<Vec<_>>()
+    }
+
+    pub fn available_generic_procs(&self, cpunit: &CompilationUnit) -> Vec<Rc<GenericProc>> {
+        let files = self.files_needed_to_resolve_current_file(cpunit);
+        files
+            .flat_map(|file| {
+                file.borrow()
+                    .root_scope
                     .borrow()
-                    .procs
+                    .generic_procs
                     .iter()
-                    .filter(|p| p.sym.is_exported)
-                    .cloned(),
-            )
+                    .filter(|p| p.underlying_proc.sym.is_exported)
+                    .cloned()
+                    .collect::<Vec<_>>()
+            })
+            .chain(self.root_scope.borrow().generic_procs.iter().cloned())
             .collect::<Vec<_>>()
     }
 }

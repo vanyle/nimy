@@ -1,15 +1,38 @@
 use std::{cell::LazyCell, rc::Rc};
 
 use crate::nimy::{
+    namedprocs::NimProc,
     trees::{NodeKind, ParseNode},
     type_constraints::{self},
-    types::{GenericParameterType, NimType},
+    types::{GenericParameterType, NimProcType, NimType},
 };
 
 #[derive(Debug)]
 pub struct GenericType {
     pub underlying_type: Rc<NimType>,
     pub generics: Vec<Rc<GenericParameterType>>,
+}
+
+#[derive(Debug)]
+pub struct GenericProc {
+    pub underlying_proc: Rc<NimProc>,
+    pub generics: Vec<Rc<GenericParameterType>>,
+}
+
+impl std::fmt::Display for GenericProc {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}[{}] := {}",
+            self.underlying_proc.sym.name,
+            self.generics
+                .iter()
+                .map(|g| g.name.clone())
+                .collect::<Vec<_>>()
+                .join(", "),
+            self.underlying_proc.nimtype
+        )
+    }
 }
 
 pub struct GenericInstanciation {
@@ -111,6 +134,9 @@ fn find_and_replace_generics(
 ) -> Rc<NimType> {
     assert_eq!(argument_names.len(), arguments.len());
 
+    let find_and_replace_lambda =
+        |t: &Rc<NimType>| find_and_replace_generics(t, argument_names, arguments);
+
     match type_with_generic_param.as_ref() {
         NimType::GenericParameter(param_type) => argument_names
             .iter()
@@ -123,10 +149,34 @@ fn find_and_replace_generics(
                 }
             })
             .unwrap_or_else(|| type_with_generic_param.clone()),
-        _ => {
-            type_with_generic_param.map(|t| find_and_replace_generics(t, argument_names, arguments))
-        }
+        _ => type_with_generic_param.map(find_and_replace_lambda),
     }
+}
+
+pub fn find_and_replace_generics_in_proc(
+    proc_with_generic_param: &Rc<NimProc>,
+    argument_names: &[Rc<GenericParameterType>],
+    arguments: &[Rc<NimType>],
+) -> Rc<NimProc> {
+    let find_and_replace_lambda =
+        |t: &Rc<NimType>| find_and_replace_generics(t, argument_names, arguments);
+
+    Rc::new(NimProc {
+        nimtype: NimProcType {
+            arguments: proc_with_generic_param
+                .nimtype
+                .arguments
+                .iter()
+                .map(find_and_replace_lambda)
+                .collect(),
+            return_type: proc_with_generic_param
+                .nimtype
+                .return_type
+                .as_ref()
+                .map(|t| t.map(find_and_replace_lambda)),
+        },
+        sym: proc_with_generic_param.sym.clone(),
+    })
 }
 
 /// Create a new type by instanciating the generic.
