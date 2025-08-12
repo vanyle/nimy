@@ -22,30 +22,28 @@ Moreover, Nimy tries to sort suggestions by relevance and take types into accoun
 ## TODOs
 
 - [x] List types defined in a file
-  - [x] Basic types
-  - [x] Generics
-  - [x] Type classes
-  - [x] Ref/var/sink/...
-  - [x] Enums
-  - [x] Object variants
-  - [x] Object and tuples (with named fields)
+- [x] List generics types and evaluate generics
 - [x] Imports API
 - [x] `include` support
 - [x] Inference of dependent generic types defined in the same type block, even out-of-order
 - [ ] Support `when` with:
   - [x] Simple expressions (true and false)
+  - [x] Basic comparison operators (==)
   - [ ] `defined`
-  - [ ] Boolean operators
-  - [ ] Comparison operators
+  - [ ] Complex boolean operators
+  - [ ] More comparison operators
   - [ ] Compilation flags
   - [ ] current_platform / current_os
 - [x] List procedures defined in a file
   - [x] List procedure names
   - [x] Properly infer procedure types
   - [x] Handle generic procedures
-- [ ] Type inference for variables
-  - [ ] Variables with explicit type hint
-  - [ ] Variables with no type hint
+- [x] Type inference for variables
+  - [x] Variables with explicit type hint
+  - [x] Variables with no type hint using basic type inference from literals
+  - [x] Support for var/let declarations
+  - [ ] Variable defined as an expression (like `var a = some_function(b, c)`)
+  - [ ] Support for const declarations
 - [ ] Suggestions:
   - [ ] Suggest types
   - [ ] Suggest procedures based on their names

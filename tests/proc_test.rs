@@ -49,7 +49,7 @@ fn it_lists_available_procs() {
     // Note: might be brittle if we change how types are displayed,
     // but at least, it makes the test very readable.
     assert_eq!(
-        format!("{}", hello_proc),
+        format!("{hello_proc}"),
         "hello[A] := proc(seq[A], A): void",
         "the hello proc does not match the expected signature."
     );

@@ -13,7 +13,8 @@ use crate::nimy::{
     trees::{self, NodeKind},
     typeparser::{self},
     types::NimType,
-    varparser::handle_var_section,
+    values::ValueMutability,
+    varparser::{handle_const_section, handle_var_section},
 };
 
 fn get_expression_list_from_import<'a, 'b>(
@@ -81,7 +82,29 @@ pub fn handle_top_level(
                     });
             }
             NodeKind::VarSection => {
-                handle_var_section(cpunit, &child, scope, imports, includes, current_file_path);
+                handle_var_section(
+                    cpunit,
+                    &child,
+                    scope,
+                    imports,
+                    includes,
+                    current_file_path,
+                    ValueMutability::Var,
+                );
+            }
+            NodeKind::LetSection => {
+                handle_var_section(
+                    cpunit,
+                    &child,
+                    scope,
+                    imports,
+                    includes,
+                    current_file_path,
+                    ValueMutability::Let,
+                );
+            }
+            NodeKind::ConstSection => {
+                handle_const_section(cpunit, &child, scope, imports, includes, current_file_path);
             }
             NodeKind::IncludeStatement => {
                 handle_include_statement(cpunit, &child, scope, includes, current_file_path);

@@ -25,7 +25,7 @@ impl NimValue {
 
 #[derive(Debug)]
 pub enum ValueMutability {
-    Const(Rc<NimValue>),
+    Const(Rc<NimValue>), // the content is the compile time evaluated value
     Let,
     Var,
 }

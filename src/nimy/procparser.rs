@@ -64,7 +64,7 @@ pub fn handle_proc_declaration(
         },
     });
 
-    if generic_arguments.len() > 0 {
+    if !generic_arguments.is_empty() {
         scope.generic_procs.push(Rc::new(GenericProc {
             underlying_proc: base_proc,
             generics: generic_arguments,
