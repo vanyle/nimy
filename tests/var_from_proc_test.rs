@@ -38,4 +38,7 @@ fn it_resolves_the_types_of_variables_from_expressions() {
 
     let var3 = get_var_by_name("var3");
     assert_eq!(var3.nimtype.to_string(), "int", "var3 should be an int");
+
+    let var4 = get_var_by_name("var4");
+    assert_eq!(var4.nimtype.to_string(), "float", "var4 should be a float");
 }

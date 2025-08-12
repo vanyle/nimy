@@ -153,6 +153,24 @@ fn handle_variable_declaration(
     }
 }
 
+// Helper function to find a variable in the current scope or parent scopes
+fn find_variable_in_scope(scope: &InnerScope, variable_name: &str) -> Option<Rc<NimVariable>> {
+    // Check current scope
+    for variable in &scope.variables {
+        if variable.sym.name == variable_name {
+            return Some(variable.clone());
+        }
+    }
+
+    // Check parent scope if it exists
+    if let Some(parent_scope) = scope.parent.upgrade() {
+        let parent_scope = parent_scope.borrow();
+        return find_variable_in_scope(&parent_scope, variable_name);
+    }
+
+    None
+}
+
 // Given a value, return its type if possible.
 // Return the unknown type when inference fails.
 fn infer_type_from_value_node(
@@ -187,6 +205,25 @@ fn infer_type_from_value_node(
         NodeKind::ArrayConstruction => {
             // Handle array construction like ["aa"] - treat same as bracket expression
             infer_type_from_bracket_expression(value_node, cpunit, scope, current_file_path)
+        }
+        NodeKind::Identifier => {
+            // Handle variable references - look up the variable in scope
+            let identifier_name = value_node.to_str();
+
+            // Look for the variable in the current scope and parent scopes
+            if let Some(variable) = find_variable_in_scope(scope, &identifier_name) {
+                variable.nimtype.clone()
+            } else {
+                // Variable not found, return undefined type
+                Rc::new(NimType::Undefined(Symbol::new(
+                    format!("unknown variable: {identifier_name}"),
+                    value_node.start_byte(),
+                    value_node.end_byte(),
+                    None,
+                    current_file_path.clone(),
+                    false,
+                )))
+            }
         }
         _ => {
             // For unknown node types, create an undefined type
