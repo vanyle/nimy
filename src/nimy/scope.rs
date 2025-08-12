@@ -11,7 +11,8 @@ use crate::nimy::{
     generics::GenericProc,
     namedprocs::NimProc,
     namedtypes::{NamedGenericType, NamedRegularType},
-    sourcefiles, trees,
+    sourcefiles::{self, SourceFile},
+    trees,
     types::{GenericParameterType, NimType},
     values::NimVariable,
 };
@@ -140,45 +141,18 @@ impl InnerScope {
 /// If the identifier does not represent a valid type, return None
 pub fn resolve_type(
     type_name: &str,
-    _cpunit: &CompilationUnit,
+    cpunit: &CompilationUnit,
     scope: &InnerScope,
     generic_parameters: &[Rc<GenericParameterType>],
 ) -> Option<Rc<NimType>> {
-    use crate::nimy::types;
-
-    let t = types::str_to_type(type_name);
-    if let Some(t) = t {
-        return Some(t);
-    }
-    // Generic type name take precedence
-    for generic_parameter in generic_parameters {
-        if type_name == generic_parameter.name {
-            return Some(Rc::new(NimType::GenericParameter(
-                generic_parameter.clone(),
-            )));
-        }
-    }
-    for t in &scope.types {
-        if t.sym.name == type_name {
-            return Some(t.content.clone());
-        }
-    }
-    if let Some(parent_scope) = scope.parent.upgrade() {
-        let parent_scope = parent_scope.borrow();
-        let resulting_type = resolve_type(type_name, _cpunit, &parent_scope, generic_parameters);
-        return resulting_type;
-    };
-    // Try to resolve type based on imports
-    // MARK: TODO Imports T
-
-    None
+    resolve_type_with_imports(type_name, cpunit, scope, generic_parameters, None)
 }
 
 /// Resolve a procedure by name and argument types, considering overloading
 pub fn resolve_proc(
     proc_name: &str,
     arg_types: &[Rc<NimType>],
-    _cpunit: &CompilationUnit,
+    cpunit: &CompilationUnit,
     scope: &InnerScope,
 ) -> Option<Rc<NimProc>> {
     // Look for procedures with matching name
@@ -200,7 +174,85 @@ pub fn resolve_proc(
     // Check parent scope
     if let Some(parent_scope) = scope.parent.upgrade() {
         let parent_scope = parent_scope.borrow();
-        return resolve_proc(proc_name, arg_types, _cpunit, &parent_scope);
+        return resolve_proc(proc_name, arg_types, cpunit, &parent_scope);
+    }
+
+    None
+}
+
+/// Given an identifier, return the type it represents, checking imports if source_file is provided.
+/// If the identifier does not represent a valid type, return None
+pub fn resolve_type_with_imports(
+    type_name: &str,
+    cpunit: &CompilationUnit,
+    scope: &InnerScope,
+    generic_parameters: &[Rc<GenericParameterType>],
+    source_file: Option<&SourceFile>,
+) -> Option<Rc<NimType>> {
+    use crate::nimy::types;
+
+    // Check if it's a basic type first
+    let t = types::str_to_type(type_name);
+    if let Some(t) = t {
+        return Some(t);
+    }
+
+    // Check if it's a generic parameter
+    for generic_param in generic_parameters {
+        if generic_param.name == type_name {
+            return Some(Rc::new(NimType::GenericParameter(generic_param.clone())));
+        }
+    }
+
+    // Look for regular types in current scope
+    for named_type in &scope.types {
+        if named_type.sym.name == type_name {
+            return Some(named_type.content.clone());
+        }
+    }
+
+    // Look for generic types in current scope
+    for generic_type in &scope.generic_types {
+        if generic_type.sym.name == type_name {
+            return Some(Rc::new(NimType::AliasGeneric(
+                generic_type.sym.name.clone().into(),
+                vec![],
+            )));
+        }
+    }
+
+    // Check parent scope
+    if let Some(parent_scope) = scope.parent.upgrade() {
+        let parent_scope = parent_scope.borrow();
+        if let Some(result) = resolve_type_with_imports(
+            type_name,
+            cpunit,
+            &parent_scope,
+            generic_parameters,
+            source_file,
+        ) {
+            return Some(result);
+        }
+    }
+
+    // Try to resolve type based on imports
+    if let Some(source_file) = source_file {
+        // Check available types from imports
+        for available_type in source_file.available_types(cpunit) {
+            if available_type.sym.name == type_name {
+                return Some(available_type.content.clone());
+            }
+        }
+
+        // Check available generic types from imports
+        for available_generic in source_file.available_generics(cpunit) {
+            if available_generic.sym.name == type_name {
+                return Some(Rc::new(NimType::AliasGeneric(
+                    available_generic.sym.name.clone().into(),
+                    vec![],
+                )));
+            }
+        }
     }
 
     None

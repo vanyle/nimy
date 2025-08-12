@@ -39,7 +39,7 @@ Moreover, Nimy tries to sort suggestions by relevance and take types into accoun
   - [x] Variables with explicit type hint
   - [x] Variables with no type hint using basic type inference from literals
   - [x] Support for var/let declarations
-  - [ ] Variable defined as an expression (like `var a = some_function(b, c)`)
+  - [x] Variable defined as an expression (like `var a = some_function(b, c)`)
   - [ ] Support for const declarations
 - [ ] Suggestions:
   - [ ] Suggest types
