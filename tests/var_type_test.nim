@@ -1,5 +1,5 @@
 var
-    my_integer_var = 2
+    my_integer_var, my_other_integer_var = 2
     some_list: seq[bool]
 
 let other_variable: int = 3

@@ -35,9 +35,6 @@ Moreover, Nimy tries to sort suggestions by relevance and take types into accoun
   - [ ] Compilation flags
   - [ ] current_platform / current_os
 - [x] List procedures defined in a file
-  - [x] List procedure names
-  - [x] Properly infer procedure types
-  - [x] Handle generic procedures
 - [x] Type inference for variables
   - [x] Variables with explicit type hint
   - [x] Variables with no type hint using basic type inference from literals

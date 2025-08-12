@@ -173,3 +173,35 @@ pub fn resolve_type(
 
     None
 }
+
+/// Resolve a procedure by name and argument types, considering overloading
+pub fn resolve_proc(
+    proc_name: &str,
+    arg_types: &[Rc<NimType>],
+    _cpunit: &CompilationUnit,
+    scope: &InnerScope,
+) -> Option<Rc<NimProc>> {
+    // Look for procedures with matching name
+    for proc in &scope.procs {
+        if proc.sym.name == proc_name && proc.nimtype.arguments.len() == arg_types.len() {
+            // Check if argument types match
+            let types_match = proc.nimtype.arguments.iter().zip(arg_types.iter()).all(
+                |(param_type, arg_type)| {
+                    crate::nimy::types::types_are_compatible(param_type, arg_type)
+                },
+            );
+
+            if types_match {
+                return Some(proc.clone());
+            }
+        }
+    }
+
+    // Check parent scope
+    if let Some(parent_scope) = scope.parent.upgrade() {
+        let parent_scope = parent_scope.borrow();
+        return resolve_proc(proc_name, arg_types, _cpunit, &parent_scope);
+    }
+
+    None
+}

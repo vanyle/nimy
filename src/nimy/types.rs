@@ -469,3 +469,17 @@ pub fn str_to_type(s: &str) -> Option<Rc<NimType>> {
         _ => None,
     }
 }
+
+/// Check if two types are compatible for procedure resolution
+pub fn types_are_compatible(param_type: &Rc<NimType>, arg_type: &Rc<NimType>) -> bool {
+    // For now, do exact matching. In a full implementation, this would handle
+    // implicit conversions, generic type matching, etc.
+    match (param_type.as_ref(), arg_type.as_ref()) {
+        (NimType::String, NimType::String) => true,
+        (NimType::Int, NimType::Int) => true,
+        (NimType::Float, NimType::Float) => true,
+        (NimType::Bool, NimType::Bool) => true,
+        // Add more type compatibility rules as needed
+        _ => format!("{param_type}") == format!("{arg_type}"), // Fallback to string comparison
+    }
+}

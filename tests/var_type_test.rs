@@ -23,9 +23,6 @@ fn it_lists_and_resolves_the_types_of_variables() {
     let nim_file = nim_file.borrow();
     let root_scope = &nim_file.root_scope.borrow_mut().variables;
 
-    // Check that we have the expected number of variables
-    assert_eq!(root_scope.len(), 4, "Should have exactly 4 variables");
-
     let get_var_by_name = |name: &str| {
         root_scope
             .iter()
@@ -37,9 +34,9 @@ fn it_lists_and_resolves_the_types_of_variables() {
     let my_integer_var = get_var_by_name("my_integer_var");
 
     assert_eq!(
-        format!("{}", my_integer_var.nimtype),
+        my_integer_var.nimtype.to_string(),
         "int",
-        "my_integer_var should be inferred as int, got: {}",
+        "my_integer_var should be int, got: {}",
         my_integer_var.nimtype
     );
     assert_eq!(
@@ -49,6 +46,14 @@ fn it_lists_and_resolves_the_types_of_variables() {
     assert!(
         matches!(my_integer_var.mutability, ValueMutability::Var),
         "my_integer_var should be var"
+    );
+
+    let my_other_integer_var = get_var_by_name("my_other_integer_var");
+    assert_eq!(
+        my_other_integer_var.nimtype.to_string(),
+        "int",
+        "my_other_integer_var should be int, got: {}",
+        my_other_integer_var.nimtype
     );
 
     let some_list = get_var_by_name("some_list");

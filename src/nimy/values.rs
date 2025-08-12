@@ -23,7 +23,7 @@ impl NimValue {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum ValueMutability {
     Const(Rc<NimValue>), // the content is the compile time evaluated value
     Let,
@@ -36,7 +36,7 @@ pub struct NimVariable {
     pub sym: Symbol,
     pub mutability: ValueMutability,
     pub nimtype: Rc<NimType>,
-    pub raw_value: String, // value definition in the code
+    pub raw_value: String, // value definition in the code, for debug
 }
 
 /// Converts a string containing a Nim literal to its value
