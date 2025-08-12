@@ -1,7 +1,4 @@
-use nimy::nimy::{
-    cpunit::CompilationUnit,
-    types::{NimType, str_to_type},
-};
+use nimy::nimy::cpunit::CompilationUnit;
 use std::{env, path::Path};
 
 #[test]

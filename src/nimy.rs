@@ -15,8 +15,8 @@ pub mod type_constraints;
 /// Algorithms for representing and dealing with generics.
 pub mod generics;
 
-pub mod namedtypes;
 pub mod namedprocs;
+pub mod namedtypes;
 
 /// Defines a symbol, which is a piece of string with a location in a file
 pub mod symbols;
