@@ -1,0 +1,79 @@
+{
+  "name": "nimy-language-server",
+  "description": "alternative language server for Nim",
+  "license": "MIT",
+  "version": "1.5.0",
+  "categories": [],
+  "keywords": [
+    "language-server",
+    "nim"
+  ],
+  "repository": {
+    "url": "https://github.com/vanyle/nimy"
+  },
+  "engines": {
+    "vscode": "^1.100.0",
+    "node": ">=23.0.0"
+  },
+  "enabledApiProposals": [],
+  "activationEvents": [
+    "onLanguage:nim"
+  ],
+  "main": "./client/out/extension",
+  "contributes": {
+    "languages": [
+      {
+        "id": "nim",
+        "extensions": [
+          ".nim"
+        ]
+      }
+    ],
+    "configuration": {
+      "type": "object",
+      "title": "nimy-language-server",
+      "properties": {
+        "nimy-language-server.trace.server": {
+          "type": "string",
+          "scope": "window",
+          "enum": [
+            "off",
+            "messages",
+            "verbose"
+          ],
+          "enumDescriptions": [
+            "No traces",
+            "Error only",
+            "Full log"
+          ],
+          "default": "off",
+          "description": "Traces the communication between VS Code and the language server."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "package": "vite build --mode production && vsce package --no-dependencies",
+    "build": "vite build",
+    "dev": "vite build --watch"
+  },
+  "devDependencies": {
+    "@types/node": "^24.2.1",
+    "@types/vscode": "^1.102.0",
+    "@typescript-eslint/eslint-plugin": "^8.39.1",
+    "@typescript-eslint/parser": "^8.39.1",
+    "@vscode/test-electron": "^2.5.2",
+    "@vscode/vsce": "^3.6.0",
+    "cross-env": "^10.0.0",
+    "eslint": "^9.33.0",
+    "glob": "^11.0.3",
+    "typescript": "^5.9.2",
+    "typescript-eslint": "^8.39.1",
+    "vite": "^7.1.2",
+    "vscode-uri": "^3.1.0"
+  },
+  "packageManager": "pnpm@10.14.0",
+  "dependencies": {
+    "vscode-languageclient": "^9.0.1"
+  }
+}

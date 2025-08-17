@@ -12,3 +12,6 @@ env.RUSTFLAGS = "-A warnings"
 need_stdout = true
 background = false
 ignored_lines = []
+
+[jobs.build]
+command = ["cargo", "build"]

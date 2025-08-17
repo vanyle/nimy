@@ -48,7 +48,17 @@ Moreover, Nimy tries to sort suggestions by relevance and take types into accoun
   - [ ] Suggest variables
 - [ ] LSP integration for suggestions
 - [ ] VSCode integration
+  - [x] VSCode extension
+  - [x] LSP Scaffolding
+  - [ ] Feed suggestions to the LSP
 - [ ] Generating errors
 - [ ] Specific imports (import from, import except)
 - [ ] Indexing and caching
 - [ ] Parallelism
+
+## Testing the VSCode extension
+
+- Start the typescript build in watch mode: `pnpm dev``
+- Start the rust build in watch mode: `bacon build`
+- Run VSCode by launching `Launch Extension` from the "Run and Debug" menu or using F5
+- Change code and run VSCode again with F5 for a fast feedback loop.

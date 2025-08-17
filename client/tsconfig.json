@@ -1,38 +1,14 @@
 {
 	"compilerOptions": {
-		"esModuleInterop": true,
-		"skipLibCheck": true,
-		"target": "es2022",
-		"allowJs": true,
-		"resolveJsonModule": true,
-		"moduleDetection": "force",
-		"isolatedModules": true,
-		"verbatimModuleSyntax": true,
-		"forceConsistentCasingInFileNames": true,
-		"noFallthroughCasesInSwitch": true,
-		"baseUrl": "src",
-
+		"sourceMap": true,
 		"strict": true,
-		"noUncheckedIndexedAccess": true,
-		"noUnusedParameters": false,
-		"noUnusedLocals": true,
-		"erasableSyntaxOnly": false,
-		"noUncheckedSideEffectImports": true,
-		"noImplicitOverride": true,
-
-		// "module": "nodenext",
-		// "outDir": "dist",
-		// "sourceMap": true,
-		// "declaration": true,
-		"moduleResolution": "bundler",
-		"allowImportingTsExtensions": true,
-		"noEmit": true,
-
-		"composite": true,
-		"declarationMap": true,
-		"lib": ["es2019"]
+		"isolatedModules": true, // required for esbuild
+		"useDefineForClassFields": true,
+		"outDir": "dist",
+		"module": "commonjs",
+		"lib": ["es2024"],
+		"target": "esnext",
 	},
 	"include": ["src"],
 	"exclude": ["node_modules", ".vscode-test"],
-	"references": [{ "path": "./client" }]
 }

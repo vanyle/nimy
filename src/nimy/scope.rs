@@ -152,7 +152,7 @@ pub fn resolve_type(
 pub fn resolve_proc(
     proc_name: &str,
     arg_types: &[Rc<NimType>],
-    cpunit: &CompilationUnit,
+    _cpunit: &CompilationUnit,
     scope: &InnerScope,
 ) -> Option<Rc<NimProc>> {
     // Look for procedures with matching name
@@ -174,7 +174,7 @@ pub fn resolve_proc(
     // Check parent scope
     if let Some(parent_scope) = scope.parent.upgrade() {
         let parent_scope = parent_scope.borrow();
-        return resolve_proc(proc_name, arg_types, cpunit, &parent_scope);
+        return resolve_proc(proc_name, arg_types, _cpunit, &parent_scope);
     }
 
     None

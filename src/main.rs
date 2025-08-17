@@ -1,39 +1,126 @@
-use std::path::Path;
-
-use ::nimy::nimy::cpunit::CompilationUnit;
+use log::debug;
+use serde_json::Value;
+use tower_lsp::{
+    LanguageServer, LspService, Server, jsonrpc,
+    lsp_types::{
+        DidChangeConfigurationParams, DidChangeTextDocumentParams, DidChangeWatchedFilesParams,
+        DidChangeWorkspaceFoldersParams, DidOpenTextDocumentParams, DidSaveTextDocumentParams,
+        ExecuteCommandParams, GotoDefinitionParams, GotoDefinitionResponse, InitializeParams,
+        InitializeResult, InitializedParams, InlayHint, Location, OneOf, ReferenceParams,
+        SaveOptions, SemanticTokensParams, SemanticTokensRangeParams, SemanticTokensRangeResult,
+        SemanticTokensResult, ServerCapabilities, TextDocumentSyncCapability, TextDocumentSyncKind,
+        TextDocumentSyncOptions, TextDocumentSyncSaveOptions,
+    },
+};
 
 pub mod nimy;
 
-fn main() {
-    let path = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join(Path::new(file!()).parent().unwrap())
-        .join("../scratchpad.nim")
-        .canonicalize()
-        .expect("Failed to canonicalize path");
-    let file = include_str!("../scratchpad.nim");
+#[derive(Debug)]
+struct Backend;
 
-    let compilation_unit = CompilationUnit::new(false);
-    let nim_file = compilation_unit.query_file(&path, Some(file.as_bytes()));
-
-    let nim_file = nim_file.borrow();
-
-    println!("Available procs");
-    for proc in &nim_file.available_procs(&compilation_unit) {
-        println!("  {proc}");
+#[tower_lsp::async_trait]
+impl LanguageServer for Backend {
+    async fn initialize(&self, _: InitializeParams) -> Result<InitializeResult, jsonrpc::Error> {
+        Ok(InitializeResult {
+            capabilities: ServerCapabilities {
+                inlay_hint_provider: Some(OneOf::Left(true)),
+                text_document_sync: Some(TextDocumentSyncCapability::Options(
+                    TextDocumentSyncOptions {
+                        open_close: Some(true),
+                        change: Some(TextDocumentSyncKind::FULL),
+                        save: Some(TextDocumentSyncSaveOptions::SaveOptions(SaveOptions {
+                            include_text: Some(true),
+                        })),
+                        ..Default::default()
+                    },
+                )),
+                definition_provider: Some(OneOf::Left(true)),
+                references_provider: Some(OneOf::Left(true)),
+                ..ServerCapabilities::default()
+            },
+            server_info: None,
+            offset_encoding: None,
+        })
+    }
+    async fn shutdown(&self) -> Result<(), jsonrpc::Error> {
+        Ok(())
+    }
+    async fn initialized(&self, _: InitializedParams) {
+        debug!("LSP Server Initialized");
+    }
+    async fn did_open(&self, _params: DidOpenTextDocumentParams) {}
+    async fn did_change(&self, _params: DidChangeTextDocumentParams) {}
+    async fn did_save(&self, _params: DidSaveTextDocumentParams) {}
+    async fn goto_definition(
+        &self,
+        _params: GotoDefinitionParams,
+    ) -> Result<Option<GotoDefinitionResponse>, jsonrpc::Error> {
+        Ok(None)
+    }
+    async fn references(
+        &self,
+        _params: ReferenceParams,
+    ) -> Result<Option<Vec<Location>>, jsonrpc::Error> {
+        Ok(None)
+    }
+    async fn semantic_tokens_full(
+        &self,
+        _params: SemanticTokensParams,
+    ) -> Result<Option<SemanticTokensResult>, jsonrpc::Error> {
+        Ok(None)
+    }
+    async fn semantic_tokens_range(
+        &self,
+        _params: SemanticTokensRangeParams,
+    ) -> Result<Option<SemanticTokensRangeResult>, jsonrpc::Error> {
+        Ok(None)
+    }
+    async fn inlay_hint(
+        &self,
+        _params: tower_lsp::lsp_types::InlayHintParams,
+    ) -> Result<Option<Vec<InlayHint>>, jsonrpc::Error> {
+        Ok(None)
+    }
+    async fn completion(
+        &self,
+        _params: tower_lsp::lsp_types::CompletionParams,
+    ) -> Result<Option<tower_lsp::lsp_types::CompletionResponse>, jsonrpc::Error> {
+        Ok(None)
+    }
+    async fn rename(
+        &self,
+        _params: tower_lsp::lsp_types::RenameParams,
+    ) -> Result<Option<tower_lsp::lsp_types::WorkspaceEdit>, jsonrpc::Error> {
+        Ok(None)
+    }
+    async fn did_change_configuration(&self, _: DidChangeConfigurationParams) {
+        debug!("configuration changed!");
     }
 
-    println!("Available generic procs:");
-    for t in &nim_file.available_generic_procs(&compilation_unit) {
-        println!("  {t}");
+    async fn did_change_workspace_folders(&self, _: DidChangeWorkspaceFoldersParams) {
+        debug!("workspace folders changed!");
     }
 
-    println!("Available types:");
-    for t in &nim_file.available_types(&compilation_unit) {
-        println!("  {t}");
+    async fn did_change_watched_files(&self, _: DidChangeWatchedFilesParams) {
+        debug!("watched files have changed!");
     }
 
-    println!("Available generics:");
-    for t in &nim_file.available_generics(&compilation_unit) {
-        println!("  {t}");
+    async fn execute_command(
+        &self,
+        _: ExecuteCommandParams,
+    ) -> Result<Option<Value>, jsonrpc::Error> {
+        debug!("command executed!");
+        Ok(None)
     }
+}
+#[tokio::main]
+async fn main() {
+    env_logger::init();
+
+    let stdin = tokio::io::stdin();
+    let stdout = tokio::io::stdout();
+
+    let (service, socket) = LspService::build(|_client| Backend {}).finish();
+
+    Server::new(stdin, stdout, socket).serve(service).await;
 }
